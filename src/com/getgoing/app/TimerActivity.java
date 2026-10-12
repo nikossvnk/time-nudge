@@ -71,7 +71,7 @@ public class TimerActivity extends Activity {
         status.setGravity(Gravity.CENTER);
         root.addView(status);
 
-        outButton = Ui.button(this, "I'm out ✓", Ui.GREEN, 26);
+        outButton = Ui.button(this, "Done ✓", Ui.GREEN, 26);
         LinearLayout.LayoutParams big = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 84));
         big.topMargin = Ui.dp(this, 16);
@@ -163,9 +163,9 @@ public class TimerActivity extends Activity {
         float progress = (now - TimerService.startElapsed) / (float) total;
 
         String label = TimerService.label;
-        labelView.setText(label.isEmpty() ? "Get going" : label);
+        labelView.setText(label.isEmpty() ? "Timer" : label);
         long leaveWall = TimerService.startWall + total;
-        leaveBy.setText("Leave by " + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date(leaveWall)));
+        leaveBy.setText("Ends at " + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date(leaveWall)));
 
         if (remaining > 0) {
             int color = Ui.colorFor(progress);
@@ -173,16 +173,16 @@ public class TimerActivity extends Activity {
             wedge.set(remaining / (float) total, color, false, false);
             clock.setText(Ui.clock(remaining, true));
             clock.setTextColor(color);
-            status.setText(remaining <= 60000 ? "Go now" : "left");
+            status.setText(remaining <= 60000 ? "Finish up" : "left");
         } else {
             boolean flash = ((-remaining) / 500) % 2 == 0;
             root.setBackgroundColor(flash ? Ui.blend(Ui.BG, Ui.RED, 0.45f) : Ui.BG);
             wedge.set(0f, Ui.RED, true, flash);
             clock.setText("+" + Ui.clock(-remaining, false));
             clock.setTextColor(Ui.RED);
-            status.setText("LATE. Leave now!");
+            status.setText("Over time. Wrap it up!");
         }
-        outButton.setText("I'm out ✓");
+        outButton.setText("Done ✓");
         silenceButton.setVisibility(TimerService.alarmRinging ? View.VISIBLE : View.INVISIBLE);
         cancelButton.setVisibility(View.VISIBLE);
     }
@@ -197,7 +197,7 @@ public class TimerActivity extends Activity {
         leaveBy.setText("Planned " + Ui.clock(run.plannedMs, false) + ", took " + Ui.clock(run.actualMs, false));
         clock.setText(Ui.signed(over));
         clock.setTextColor(color);
-        status.setText(over <= 0 ? "On time. Nice!" : (run.confirmed ? "over your plan" : "over (auto-ended, nobody tapped I'm out)"));
+        status.setText(over <= 0 ? "On time. Nice!" : (run.confirmed ? "over your plan" : "over (auto-ended, nobody tapped Done)"));
         outButton.setText("Done");
         silenceButton.setVisibility(View.INVISIBLE);
         cancelButton.setVisibility(View.INVISIBLE);

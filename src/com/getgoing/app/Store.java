@@ -32,7 +32,7 @@ final class Store {
         final String label;
         final long plannedMs;
         final long actualMs;
-        final boolean confirmed;   // false when the timer auto-ended because nobody tapped "I'm out"
+        final boolean confirmed;   // false when the timer auto-ended because nobody tapped "Done"
 
         Run(long startedAt, String label, long plannedMs, long actualMs, boolean confirmed) {
             this.startedAt = startedAt;
@@ -55,9 +55,9 @@ final class Store {
         List<Preset> out = new ArrayList<Preset>();
         String raw = prefs(c).getString(KEY_PRESETS, null);
         if (raw == null) {
-            out.add(new Preset("Leave for work", 15));
-            out.add(new Preset("Quick errand", 10));
-            out.add(new Preset("Gym", 20));
+            out.add(new Preset("Get ready to leave", 15));
+            out.add(new Preset("Quick task", 10));
+            out.add(new Preset("Focus block", 25));
             savePresets(c, out);
             return out;
         }

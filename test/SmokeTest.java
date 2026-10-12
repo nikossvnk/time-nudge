@@ -44,12 +44,12 @@ public class SmokeTest {
         ActivityController<MainActivity> main = Robolectric.buildActivity(MainActivity.class).setup();
         String home = allText(main.get().getWindow().getDecorView());
         System.out.println("HOME: " + home);
-        assertTrue(home.contains("Leave for work"));
+        assertTrue(home.contains("Get ready to leave"));
 
         TimerService svc = Robolectric.buildService(TimerService.class).create().get();
         svc.onInit(TextToSpeech.SUCCESS);
         svc.onStartCommand(new Intent(TimerService.ACTION_START).putExtra(TimerService.EXTRA_MS, 10 * 60000L)
-                .putExtra(TimerService.EXTRA_LABEL, "Leave for work"), 0, 1);
+                .putExtra(TimerService.EXTRA_LABEL, "Get ready to leave"), 0, 1);
         advance(1000);
         System.out.println("t=0: " + spoken(svc));
         assertTrue(TimerService.running);
@@ -66,7 +66,7 @@ public class SmokeTest {
             System.out.println("t=" + m / 1000 + "s spoken=" + spoken(svc) + " ringing=" + TimerService.alarmRinging);
         }
         System.out.println("TIMER LATE: " + allText(timer.get().getWindow().getDecorView()));
-        assertEquals("One minute late. Go now!", spoken(svc));
+        assertEquals("One minute over. Time to stop.", spoken(svc));
 
         svc.onStartCommand(new Intent(TimerService.ACTION_DONE), 0, 2);
         assertFalse(TimerService.running);

@@ -42,7 +42,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private static final long ALARM_MAX_OVERTIME = 2 * MINUTE;
     /** Spoken "N minutes late" reminders stop after this much overtime. */
     private static final long VOICE_MAX_OVERTIME = 15 * MINUTE;
-    /** If nobody taps "I'm out" by now, the run is closed and logged as unconfirmed. */
+    /** If nobody taps "Done" by now, the run is closed and logged as unconfirmed. */
     private static final long AUTO_END_OVERTIME = 30 * MINUTE;
 
     // Shared with the UI.
@@ -211,7 +211,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         if (remaining <= 0 && !finalFired) {
             finalFired = true;
             setLoudness(1f);
-            alert(3, "Time's up. Leave now!");
+            alert(3, "Time's up!");
             handler.postDelayed(resumeAlarm, 3500);
         }
 
@@ -227,7 +227,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
                 lastOverMinute = overMinute;
                 stopAlarm();
                 handler.removeCallbacks(resumeAlarm);
-                alert(3, (overMinute == 1 ? "One minute" : overMinute + " minutes") + " late. Go now!");
+                alert(3, (overMinute == 1 ? "One minute" : overMinute + " minutes") + " over. Time to stop.");
                 if (over < ALARM_MAX_OVERTIME) handler.postDelayed(resumeAlarm, 4500);
             }
         }
@@ -373,8 +373,8 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     }
 
     private static String checkpointPhrase(long remainingMs) {
-        if (remainingMs < MINUTE) return "30 seconds. Go!";
-        if (remainingMs == MINUTE) return "One minute left. Shoes, keys, out.";
+        if (remainingMs < MINUTE) return "30 seconds.";
+        if (remainingMs == MINUTE) return "One minute left. Finish up.";
         if (remainingMs == 2 * MINUTE) return "2 minutes left. Wrap it up.";
         return minutesPhrase(remainingMs) + " left.";
     }
@@ -382,7 +382,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private Notification buildNotification() {
         PendingIntent open = PendingIntent.getActivity(this, 0,
                 new Intent(this, TimerActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-        String title = label.isEmpty() ? "Get Going" : label;
+        String title = label.isEmpty() ? "Timer" : label;
         return new Notification.Builder(this)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)

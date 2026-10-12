@@ -27,7 +27,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
-/** Home screen: enter minutes, pick a preset, or pick a time to leave by. Shows the track record. */
+/** Home screen: enter minutes, pick a preset, or pick an end time. Shows the track record. */
 public class MainActivity extends Activity {
     private static final int[] QUICK = {5, 10, 15, 20, 30};
 
@@ -59,7 +59,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        TextView title = Ui.text(this, "How long until you leave?", 26, Ui.TEXT);
+        TextView title = Ui.text(this, "How long do you have?", 26, Ui.TEXT);
         col.addView(title, fullWidth(LinearLayout.LayoutParams.WRAP_CONTENT, 8));
 
         LinearLayout entry = new LinearLayout(this);
@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         col.addView(row, fullWidth(60, 10));
-        Button leaveAt = Ui.button(this, "Leave at a time…", Ui.CARD, 18);
+        Button leaveAt = Ui.button(this, "Until a time…", Ui.CARD, 18);
         LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         half.rightMargin = Ui.dp(this, 10);
         row.addView(leaveAt, half);
@@ -226,7 +226,7 @@ public class MainActivity extends Activity {
                     return;
                 }
                 String when = DateFormat.getTimeFormat(MainActivity.this).format(target.getTime());
-                startTimer(ms, "Leave at " + when);
+                startTimer(ms, "Until " + when);
             }
         }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), DateFormat.is24HourFormat(this)).show();
     }
@@ -235,7 +235,7 @@ public class MainActivity extends Activity {
         final Integer m = enteredMinutes();
         if (m == null) return;
         final EditText name = new EditText(this);
-        name.setHint("e.g. Leave for work");
+        name.setHint("e.g. Get ready to leave");
         name.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         new AlertDialog.Builder(this)
                 .setTitle("Save " + m + " min preset")
