@@ -1,4 +1,4 @@
-package com.getgoing.app;
+package com.timenudge.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;

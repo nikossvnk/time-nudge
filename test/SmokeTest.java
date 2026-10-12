@@ -1,4 +1,4 @@
-package com.getgoing.app;
+package com.timenudge.app;
 
 import static org.junit.Assert.*;
 

@@ -1,4 +1,4 @@
-package com.getgoing.app;
+package com.timenudge.app;
 
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -30,10 +30,10 @@ import java.util.TreeSet;
  * The UI reads the static fields below; there is only ever one timer at a time.
  */
 public class TimerService extends Service implements TextToSpeech.OnInitListener {
-    static final String ACTION_START = "com.getgoing.app.START";
-    static final String ACTION_DONE = "com.getgoing.app.DONE";
-    static final String ACTION_CANCEL = "com.getgoing.app.CANCEL";
-    static final String ACTION_SILENCE = "com.getgoing.app.SILENCE";
+    static final String ACTION_START = "com.timenudge.app.START";
+    static final String ACTION_DONE = "com.timenudge.app.DONE";
+    static final String ACTION_CANCEL = "com.timenudge.app.CANCEL";
+    static final String ACTION_SILENCE = "com.timenudge.app.SILENCE";
     static final String EXTRA_MS = "ms";
     static final String EXTRA_LABEL = "label";
 
@@ -128,7 +128,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         tts = new TextToSpeech(this, this);
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GetGoing:timer");
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TimeNudge:timer");
     }
 
     @Override
@@ -312,7 +312,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         if (!ttsReady) return;
         Bundle params = new Bundle();
         params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM);
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "getgoing");
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "timenudge");
     }
 
     /** Sets the alarm stream to a fraction of its maximum (never quieter than the user had it). */

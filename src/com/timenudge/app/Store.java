@@ -1,4 +1,4 @@
-package com.getgoing.app;
+package com.timenudge.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -12,7 +12,7 @@ import java.util.List;
 
 /** Presets and run history, kept as small JSON arrays in SharedPreferences. */
 final class Store {
-    private static final String PREFS = "getgoing";
+    private static final String PREFS = "timenudge";
     private static final String KEY_PRESETS = "presets";
     private static final String KEY_HISTORY = "history";
     private static final int MAX_HISTORY = 100;

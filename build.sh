@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds Get Going without Gradle: aapt + javac + dx + apksigner (Ubuntu android-sdk packages).
+# Builds Time Nudge without Gradle: aapt + javac + dx + apksigner (Ubuntu android-sdk packages).
 set -e
 cd "$(dirname "$0")"
 SDK=/usr/lib/android-sdk
@@ -12,11 +12,11 @@ javac -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath $JAR -encoding 
 $BT/dx --dex --min-sdk-version=25 --output=build/dex/classes.dex build/obj
 (cd build/dex && aapt add ../unsigned.apk classes.dex >/dev/null)
 zipalign -f 4 build/unsigned.apk build/aligned.apk
-KS=${KEYSTORE:-keystore/getgoing.jks}
+KS=${KEYSTORE:-keystore/timenudge.jks}
 if [ ! -f "$KS" ]; then
   mkdir -p "$(dirname "$KS")"
-  keytool -genkeypair -keystore "$KS" -storepass getgoing -keypass getgoing -alias getgoing \
-    -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Get Going" >/dev/null 2>&1
+  keytool -genkeypair -keystore "$KS" -storepass timenudge -keypass timenudge -alias timenudge \
+    -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Time Nudge" >/dev/null 2>&1
 fi
-apksigner sign --ks "$KS" --ks-pass pass:getgoing --key-pass pass:getgoing --out build/GetGoing.apk build/aligned.apk
-apksigner verify build/GetGoing.apk && ls -la build/GetGoing.apk
+apksigner sign --ks "$KS" --ks-pass pass:timenudge --key-pass pass:timenudge --out build/TimeNudge.apk build/aligned.apk
+apksigner verify build/TimeNudge.apk && ls -la build/TimeNudge.apk

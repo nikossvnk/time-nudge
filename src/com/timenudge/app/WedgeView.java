@@ -1,4 +1,4 @@
-package com.getgoing.app;
+package com.timenudge.app;
 
 import android.content.Context;
 import android.graphics.Canvas;
