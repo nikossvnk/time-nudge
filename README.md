@@ -22,9 +22,18 @@ sudo apt install android-sdk-platform-23 aapt apksigner dalvik-exchange zipalign
 ./build.sh            # → build/TimeNudge.apk
 ```
 
-`build.sh` creates a signing key in `keystore/` on first run (it is gitignored). Keep it: updates
-signed with the same key install over the old version without losing presets and history.
-Set `KEYSTORE=/path/to/key.jks` to use another one.
+`build.sh` signs with `keystore/timenudge.jks` (gitignored), or with `KEYSTORE=/path/to/key.jks`, and
+stops if the key isn't there. Keep the key: updates signed with the same key install over the old
+version without losing presets and history. To create one the first time:
+
+```sh
+mkdir -p keystore && keytool -genkeypair -keystore keystore/timenudge.jks -storepass timenudge \
+  -keypass timenudge -alias timenudge -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Time Nudge"
+```
+
+GitHub Actions builds the APK on every push (download it from the run's artifacts) and attaches it to
+a release when you push a `v*` tag. It signs with the repository secret `KEYSTORE_BASE64`
+(`base64 -w0 timenudge.jks | gh secret set KEYSTORE_BASE64`).
 
 ## Test
 `test/` holds a Robolectric smoke test (Maven + JDK 8) that runs a full 10-minute timer in simulated time.
