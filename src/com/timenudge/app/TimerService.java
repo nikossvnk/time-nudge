@@ -40,8 +40,6 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private static final long MINUTE = 60000L;
     /** The looping alarm sound stops by itself after this much overtime (voice reminders continue). */
     private static final long ALARM_MAX_OVERTIME = 2 * MINUTE;
-    /** Spoken "N minutes late" reminders stop after this much overtime. */
-    private static final long VOICE_MAX_OVERTIME = 15 * MINUTE;
     /** If nobody taps "Done" by now, the run is closed and logged as unconfirmed. */
     private static final long AUTO_END_OVERTIME = 30 * MINUTE;
 
@@ -86,18 +84,23 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     };
 
     /**
-     * Remaining-time moments (ms, largest first) at which to announce. They get denser near the
-     * end: 70%, 40%, 20%, 10% remaining, plus 2 min, 1 min and 30 s for longer timers.
+     * Remaining-time moments (ms, largest first) at which to announce, never more than 5 minutes
+     * apart. Up to 15 minutes they get denser near the end: 70%, 40%, 20%, 10% remaining. Longer
+     * timers announce every 5 minutes left. Both add 2 min, 1 min and 30 s.
      * For 10 minutes that is alerts at 3, 6, 8, 9 and 9.5 minutes elapsed, then the alarm at 10.
      */
     static List<Long> checkpointsFor(long totalMs) {
         TreeSet<Long> set = new TreeSet<Long>(Collections.<Long>reverseOrder());
-        double[] fractions = {0.7, 0.4, 0.2, 0.1};
-        for (double f : fractions) {
-            long m = Math.round(totalMs * f / MINUTE) * MINUTE;
-            if (m >= MINUTE) set.add(m);
+        if (totalMs > 15 * MINUTE) {
+            for (long m = 5 * MINUTE; m < totalMs; m += 5 * MINUTE) set.add(m);
+        } else {
+            double[] fractions = {0.7, 0.4, 0.2, 0.1};
+            for (double f : fractions) {
+                long m = Math.round(totalMs * f / MINUTE) * MINUTE;
+                if (m >= MINUTE) set.add(m);
+            }
+            if (totalMs == 15 * MINUTE) set.add(5 * MINUTE);
         }
-        if (totalMs >= 15 * MINUTE) set.add(5 * MINUTE);
         if (totalMs >= 5 * MINUTE) {
             set.add(2 * MINUTE);
             set.add(MINUTE);
@@ -109,6 +112,15 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             if (m <= totalMs - 30000L) out.add(m);
         }
         return out;
+    }
+
+    /**
+     * The latest whole minute of overtime that gets a spoken reminder: every minute up to 10,
+     * then every 5 minutes. Returns 0 before the first one.
+     */
+    static long overtimeMark(long overMinute) {
+        if (overMinute > 10) return overMinute - overMinute % 5;
+        return overMinute;
     }
 
     static void start(Context c, long ms, String label) {
@@ -223,11 +235,12 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
                 return;
             }
             if (alarmRinging && over >= ALARM_MAX_OVERTIME) stopAlarm();
-            if (overMinute >= 1 && overMinute > lastOverMinute && over < VOICE_MAX_OVERTIME) {
-                lastOverMinute = overMinute;
+            long mark = overtimeMark(overMinute);
+            if (mark >= 1 && mark > lastOverMinute) {
+                lastOverMinute = mark;
                 stopAlarm();
                 handler.removeCallbacks(resumeAlarm);
-                alert(3, (overMinute == 1 ? "One minute" : overMinute + " minutes") + " over. Time to stop.");
+                alert(3, (mark == 1 ? "One minute" : mark + " minutes") + " over. Time to stop.");
                 if (over < ALARM_MAX_OVERTIME) handler.postDelayed(resumeAlarm, 4500);
             }
         }
