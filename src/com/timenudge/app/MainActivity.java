@@ -7,15 +7,25 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.text.format.DateFormat;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -36,6 +46,22 @@ public class MainActivity extends Activity {
     private LinearLayout presetList;
     private LinearLayout historyList;
     private TextView historySummary;
+    /** History shows this many runs until "Show all" is tapped. */
+    private static final int RUNS_FOLDED = 5;
+    private boolean showAllRuns;
+    /** How long the Undo bar stays after a preset is swiped away. */
+    private static final long UNDO_MS = 8000;
+    /** The last swiped-away preset and where it was, while its Undo bar shows. */
+    private Store.Preset deletedPreset;
+    private int deletedIndex;
+    private final Handler handler = new Handler();
+    private final Runnable hideUndo = new Runnable() {
+        @Override
+        public void run() {
+            deletedPreset = null;
+            renderPresets();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle state) {
@@ -132,7 +158,7 @@ public class MainActivity extends Activity {
         presetList = new LinearLayout(this);
         presetList.setOrientation(LinearLayout.VERTICAL);
         col.addView(presetList);
-        col.addView(Ui.text(this, "Long-press a preset to delete it.", 14, Ui.MUTED), fullWidth(LinearLayout.LayoutParams.WRAP_CONTENT, 6));
+        col.addView(Ui.text(this, "Swipe a preset left to delete it. Long-press one with a usual time to switch to it.", 14, Ui.MUTED), fullWidth(LinearLayout.LayoutParams.WRAP_CONTENT, 6));
 
         col.addView(header("Your track record"));
         historySummary = Ui.text(this, "", 18, Ui.TEXT);
@@ -166,9 +192,18 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        runningBanner.setVisibility(TimerService.running ? View.VISIBLE : View.GONE);
+        boolean saved = Store.activeTimer(this) != null;
+        // A saved timer that isn't running means Android killed the app: bring the timer back.
+        if (!TimerService.running && saved) TimerService.send(this, TimerService.ACTION_WAKE);
+        runningBanner.setVisibility(TimerService.running || saved ? View.VISIBLE : View.GONE);
         renderPresets();
         renderHistory();
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(hideUndo);
+        super.onDestroy();
     }
 
     private LinearLayout.LayoutParams fullWidth(int heightDp, int topMarginDp) {
@@ -258,37 +293,157 @@ public class MainActivity extends Activity {
     private void renderPresets() {
         presetList.removeAllViews();
         final List<Store.Preset> presets = Store.presets(this);
+        List<Store.Run> runs = Store.history(this);
         for (int i = 0; i < presets.size(); i++) {
+            if (deletedPreset != null && i == deletedIndex) addUndoBar();
             final Store.Preset p = presets.get(i);
             final int index = i;
-            Button b = Ui.button(this, p.name + "  ·  " + p.minutes + " min", Ui.CARD, 20);
+            final Integer typical = Store.typicalMinutes(runs, p.name);
+            SpannableStringBuilder text = new SpannableStringBuilder(p.name + "  ·  " + p.minutes + " min");
+            if (typical != null) {
+                int from = text.length();
+                text.append("\nusually ").append(String.valueOf(typical)).append(" min");
+                text.setSpan(new RelativeSizeSpan(0.7f), from, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new ForegroundColorSpan(typical > p.minutes ? Ui.AMBER : Ui.MUTED), from,
+                        text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            Button b = Ui.button(this, "", Ui.CARD, 20);
+            b.setText(text);
             b.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
             b.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
-            presetList.addView(b, fullWidth(64, i == 0 ? 0 : 8));
+
+            // Behind the preset: a red "Delete" that shows as it's swiped left.
+            FrameLayout row = new FrameLayout(this);
+            TextView behind = Ui.button(this, "Delete", Ui.RED, 18);
+            behind.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+            behind.setPadding(0, 0, Ui.dp(this, 22), 0);
+            behind.setClickable(false);
+            row.addView(behind, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT));
+            row.addView(b, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT));
+            presetList.addView(row, fullWidth(typical != null ? 80 : 64, presetList.getChildCount() == 0 ? 0 : 8));
+
             b.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     startTimer(p.minutes * 60000L, p.name);
                 }
             });
-            b.setOnLongClickListener(new View.OnLongClickListener() {
+            b.setOnTouchListener(new SwipeToDelete(new Runnable() {
                 @Override
-                public boolean onLongClick(View v) {
-                    new AlertDialog.Builder(MainActivity.this)
-                            .setMessage("Delete \"" + p.name + "\"?")
-                            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface d, int w) {
-                                    presets.remove(index);
-                                    Store.savePresets(MainActivity.this, presets);
-                                    renderPresets();
-                                }
-                            })
-                            .setNegativeButton("Keep", null)
-                            .show();
-                    return true;
+                public void run() {
+                    presets.remove(index);
+                    Store.savePresets(MainActivity.this, presets);
+                    deletedPreset = p;
+                    deletedIndex = index;
+                    handler.removeCallbacks(hideUndo);
+                    handler.postDelayed(hideUndo, UNDO_MS);
+                    renderPresets();
                 }
-            });
+            }));
+            if (typical != null && typical != p.minutes) {
+                b.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(p.name + "  ·  " + p.minutes + " min")
+                                .setMessage("It usually takes you " + typical + " min.")
+                                .setPositiveButton("Use " + typical + " min", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int w) {
+                                        presets.set(index, new Store.Preset(p.name, typical));
+                                        Store.savePresets(MainActivity.this, presets);
+                                        renderPresets();
+                                    }
+                                })
+                                .setNegativeButton("Keep " + p.minutes + " min", null)
+                                .show();
+                        return true;
+                    }
+                });
+            }
+        }
+        if (deletedPreset != null && deletedIndex >= presets.size()) addUndoBar();
+    }
+
+    /** "Deleted "X" · Undo" where the preset was; tapping it puts the preset back in its place. */
+    private void addUndoBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
+        GradientDrawable outline = new GradientDrawable();
+        outline.setCornerRadius(Ui.dp(this, 14));
+        outline.setStroke(Ui.dp(this, 1), Ui.CARD);
+        bar.setBackground(outline);
+        bar.addView(Ui.text(this, "Deleted \"" + deletedPreset.name + "\"", 16, Ui.MUTED),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView undo = Ui.text(this, "Undo", 18, Ui.ACCENT);
+        undo.setTypeface(Typeface.DEFAULT_BOLD);
+        bar.addView(undo);
+        bar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                List<Store.Preset> presets = Store.presets(MainActivity.this);
+                presets.add(Math.min(deletedIndex, presets.size()), deletedPreset);
+                Store.savePresets(MainActivity.this, presets);
+                deletedPreset = null;
+                handler.removeCallbacks(hideUndo);
+                renderPresets();
+            }
+        });
+        presetList.addView(bar, fullWidth(56, presetList.getChildCount() == 0 ? 0 : 8));
+    }
+
+    /**
+     * Drag a view left past a threshold to delete it; let go earlier and it slides back. Taps and
+     * vertical scrolling pass through untouched.
+     */
+    private final class SwipeToDelete implements View.OnTouchListener {
+        private final Runnable onDelete;
+        private final int slop = ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
+        private float downX, downY;
+        private boolean swiping;
+
+        SwipeToDelete(Runnable onDelete) {
+            this.onDelete = onDelete;
+        }
+
+        @Override
+        public boolean onTouch(final View v, MotionEvent e) {
+            float dx = e.getRawX() - downX;
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = e.getRawX();
+                    downY = e.getRawY();
+                    swiping = false;
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    if (!swiping && dx < -slop && Math.abs(dx) > Math.abs(e.getRawY() - downY)) {
+                        swiping = true;
+                        v.getParent().requestDisallowInterceptTouchEvent(true);  // keep the ScrollView out
+                        v.cancelLongPress();
+                        v.setPressed(false);
+                    }
+                    if (swiping) v.setTranslationX(Math.min(0, dx));
+                    return swiping;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (!swiping) return false;
+                    swiping = false;
+                    // Past 40% of the width (at least 100dp) deletes; anything less springs back.
+                    float threshold = Math.max(v.getWidth() * 0.4f, Ui.dp(MainActivity.this, 100));
+                    if (e.getActionMasked() == MotionEvent.ACTION_UP && -dx >= threshold) {
+                        v.animate().translationX(-Math.max(v.getWidth(), -dx)).setDuration(150);
+                        v.postDelayed(onDelete, 160);  // once it has slid out
+                    } else {
+                        v.animate().translationX(0).setDuration(150);
+                    }
+                    return true;
+                default:
+                    return swiping;
+            }
         }
     }
 
@@ -299,10 +454,19 @@ public class MainActivity extends Activity {
             historySummary.setText("No runs yet. Your real times will show up here.");
             return;
         }
+        historySummary.setText(summary(runs));
+        renderRuns(runs);
+    }
+
+    /** Stats over the last 10 confirmed runs. Auto-ended ones ("?") would count as 30 min over. */
+    private static String summary(List<Store.Run> runs) {
+        List<Store.Run> counted = Store.confirmed(runs);
+        String note = counted.size() < runs.size() ? "\nRuns marked ? ended on their own and don't count." : "";
+        if (counted.isEmpty()) return "No finished runs yet. Tap Done when you finish so the time counts." + note;
         int n = 0, onTime = 0;
         long overSum = 0;
         double ratioSum = 0;
-        for (Store.Run r : runs) {
+        for (Store.Run r : counted) {
             if (n == 10) break;
             n++;
             if (r.overMs() <= 0) onTime++;
@@ -324,18 +488,30 @@ public class MainActivity extends Activity {
         } else {
             sb.append("On average ").append(Ui.clock(-avgOver, false)).append(" early. Keep it up!");
         }
-        historySummary.setText(sb.toString());
+        return sb.append(note).toString();
+    }
 
-        SimpleDateFormat fmt = new SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault());
-        for (int i = 0; i < runs.size() && i < 15; i++) {
+    /** The latest few runs, or all of them, grouped under day headings. */
+    private void renderRuns(List<Store.Run> runs) {
+        int shown = showAllRuns ? runs.size() : Math.min(runs.size(), RUNS_FOLDED);
+        java.text.DateFormat time = DateFormat.getTimeFormat(this);
+        String lastDay = null;
+        for (int i = 0; i < shown; i++) {
             Store.Run r = runs.get(i);
+            String day = dayName(r.startedAt);
+            if (!day.equals(lastDay)) {
+                TextView heading = Ui.text(this, day, 14, Ui.ACCENT);
+                heading.setPadding(0, Ui.dp(this, lastDay == null ? 4 : 14), 0, Ui.dp(this, 2));
+                historyList.addView(heading);
+                lastDay = day;
+            }
             long over = r.overMs();
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);
-            line.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
+            line.setPadding(0, Ui.dp(this, 5), 0, Ui.dp(this, 5));
             String what = r.label.isEmpty() ? "Timer" : r.label;
-            TextView left = Ui.text(this, fmt.format(new java.util.Date(r.startedAt)) + "\n" + what
-                    + "  ·  planned " + Ui.clock(r.plannedMs, false), 15, Ui.MUTED);
+            TextView left = Ui.text(this, time.format(new java.util.Date(r.startedAt)) + "  " + what
+                    + "\nplanned " + Ui.clock(r.plannedMs, false), 15, Ui.MUTED);
             line.addView(left, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             int color = over <= 0 ? Ui.GREEN : (over < 3 * 60000 ? Ui.AMBER : Ui.RED);
             TextView right = Ui.text(this, Ui.signed(over) + (r.confirmed ? "" : "?"), 20, color);
@@ -343,5 +519,32 @@ public class MainActivity extends Activity {
             line.addView(right);
             historyList.addView(line);
         }
+        if (runs.size() > RUNS_FOLDED) {
+            TextView toggle = Ui.text(this, showAllRuns ? "Show fewer" : "Show all " + runs.size() + " runs", 16, Ui.ACCENT);
+            toggle.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 4));
+            toggle.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showAllRuns = !showAllRuns;
+                    renderHistory();
+                }
+            });
+            historyList.addView(toggle);
+        }
+    }
+
+    /** "Today", "Yesterday", or e.g. "Mon 12 Oct". */
+    private static String dayName(long wall) {
+        Calendar then = Calendar.getInstance();
+        then.setTimeInMillis(wall);
+        Calendar day = Calendar.getInstance();
+        for (int back = 0; back < 2; back++) {
+            if (day.get(Calendar.YEAR) == then.get(Calendar.YEAR)
+                    && day.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)) {
+                return back == 0 ? "Today" : "Yesterday";
+            }
+            day.add(Calendar.DAY_OF_YEAR, -1);
+        }
+        return new SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(then.getTime());
     }
 }

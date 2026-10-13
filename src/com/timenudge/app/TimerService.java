@@ -1,6 +1,8 @@
 package com.timenudge.app;
 
+import android.app.AlarmManager;
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -18,9 +20,14 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.Vibrator;
 import android.speech.tts.TextToSpeech;
+import android.text.format.DateFormat;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TreeSet;
@@ -28,12 +35,18 @@ import java.util.TreeSet;
 /**
  * Owns the running countdown so it keeps going even if the screen or the activity goes away.
  * The UI reads the static fields below; there is only ever one timer at a time.
+ *
+ * The running timer is also saved in {@link Store} so it survives Android killing the process:
+ * the service is sticky, and an exact alarm wakes it for the next announcement, so a restarted
+ * service picks up where it left off (and still restores the alarm volume at the end).
  */
 public class TimerService extends Service implements TextToSpeech.OnInitListener {
     static final String ACTION_START = "com.timenudge.app.START";
     static final String ACTION_DONE = "com.timenudge.app.DONE";
     static final String ACTION_CANCEL = "com.timenudge.app.CANCEL";
     static final String ACTION_SILENCE = "com.timenudge.app.SILENCE";
+    /** Sent by the backup alarm, and by the UI when it finds a saved timer that isn't running. */
+    static final String ACTION_WAKE = "com.timenudge.app.WAKE";
     static final String EXTRA_MS = "ms";
     static final String EXTRA_LABEL = "label";
 
@@ -42,6 +55,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private static final long ALARM_MAX_OVERTIME = 2 * MINUTE;
     /** If nobody taps "Done" by now, the run is closed and logged as unconfirmed. */
     private static final long AUTO_END_OVERTIME = 30 * MINUTE;
+    private static final int NOTIFICATION_ID = 1;
 
     // Shared with the UI.
     static volatile boolean running;
@@ -55,6 +69,8 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private final Handler handler = new Handler();
     private TextToSpeech tts;
     private boolean ttsReady;
+    /** Said once the voice is ready, if something had to be said before then. */
+    private String pendingSpeech;
     private AudioManager audio;
     private int savedAlarmVolume = -1;
     private ToneGenerator tone;
@@ -151,14 +167,15 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             tts.setLanguage(Locale.getDefault());
         }
         ttsReady = true;
-        if (running && !finalFired && nextCheckpoint == 0) {
-            speak("Timer started. " + minutesPhrase(endElapsed - startElapsed) + ".");
-        }
+        if (pendingSpeech != null && running) speak(pendingSpeech);
+        pendingSpeech = null;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
+        // A null intent means Android restarted the service after killing it.
+        if (!running && !ACTION_START.equals(action)) restore();
         if (ACTION_START.equals(action)) {
             begin(intent.getLongExtra(EXTRA_MS, 10 * MINUTE), intent.getStringExtra(EXTRA_LABEL));
         } else if (ACTION_DONE.equals(action)) {
@@ -169,14 +186,18 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             silenced = true;
             handler.removeCallbacks(resumeAlarm);
             stopAlarm();
-        } else if (!running) {
+            saveState();
+        } else if (running) {
+            onTick();
+        } else {
             stopSelf();
         }
-        return START_NOT_STICKY;
+        return running ? START_STICKY : START_NOT_STICKY;
     }
 
     private void begin(long ms, String newLabel) {
-        if (running) finish(false, false);
+        // End the old run without stopping the service, which would take the new run down with it.
+        if (running) endRun(false, false);
         long now = SystemClock.elapsedRealtime();
         startElapsed = now;
         endElapsed = now + ms;
@@ -193,12 +214,79 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
 
         savedAlarmVolume = audio.getStreamVolume(AudioManager.STREAM_ALARM);
         setLoudness(0.6f);
-        if (!wakeLock.isHeld()) wakeLock.acquire(ms + AUTO_END_OVERTIME + MINUTE);
-        startForeground(1, buildNotification());
+        resume();
+        speak("Timer started. " + minutesPhrase(ms) + ".");
+    }
 
-        if (ttsReady) speak("Timer started. " + minutesPhrase(ms) + ".");
+    /** Continues a run saved before the process was killed. Does nothing if there is none. */
+    private void restore() {
+        JSONObject a = Store.activeTimer(this);
+        if (a == null) return;
+        startElapsed = a.optLong("startElapsed");
+        endElapsed = a.optLong("endElapsed");
+        savedAlarmVolume = a.optInt("savedAlarmVolume", -1);
+        if (SystemClock.elapsedRealtime() < startElapsed) {
+            // The phone rebooted, so the saved times mean nothing now. Just undo the volume change.
+            restoreVolume();
+            Store.clearActiveTimer(this);
+            return;
+        }
+        startWall = a.optLong("startWall");
+        label = a.optString("label", "");
+        checkpoints = checkpointsFor(endElapsed - startElapsed);
+        nextCheckpoint = a.optInt("nextCheckpoint");
+        finalFired = a.optBoolean("finalFired");
+        lastOverMinute = a.optLong("lastOverMinute");
+        silenced = a.optBoolean("silenced");
+        alarmRinging = false;
+        lastRun = null;
+        running = true;
+        resume();
+        if (finalFired) handler.post(resumeAlarm);  // startAlarm() checks it's still within 2 minutes
+    }
+
+    /** Starts (or restarts) everything that keeps a run going: wake lock, notification, ticks. */
+    private void resume() {
+        long left = Math.max(0, endElapsed - SystemClock.elapsedRealtime());
+        if (!wakeLock.isHeld()) wakeLock.acquire(left + AUTO_END_OVERTIME + MINUTE);
+        startForeground(NOTIFICATION_ID, buildNotification());
+        saveState();
         handler.removeCallbacks(tick);
         handler.post(tick);
+    }
+
+    /** Saves the run so a restarted service can continue it, and sets the alarm that wakes it. */
+    private void saveState() {
+        if (!running) return;
+        try {
+            Store.saveActiveTimer(this, new JSONObject()
+                    .put("startElapsed", startElapsed).put("endElapsed", endElapsed)
+                    .put("startWall", startWall).put("label", label)
+                    .put("savedAlarmVolume", savedAlarmVolume)
+                    .put("nextCheckpoint", nextCheckpoint).put("finalFired", finalFired)
+                    .put("lastOverMinute", lastOverMinute).put("silenced", silenced));
+        } catch (JSONException ignored) {
+        }
+        alarmManager().setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                nextEventElapsed(), wakeIntent());
+    }
+
+    /** When the next announcement (or the auto-end) is due. */
+    long nextEventElapsed() {
+        if (nextCheckpoint < checkpoints.size()) return endElapsed - checkpoints.get(nextCheckpoint);
+        if (!finalFired) return endElapsed;
+        long m = lastOverMinute + 1;
+        while (overtimeMark(m) <= lastOverMinute) m++;
+        return endElapsed + Math.min(m * MINUTE, AUTO_END_OVERTIME);
+    }
+
+    private AlarmManager alarmManager() {
+        return (AlarmManager) getSystemService(ALARM_SERVICE);
+    }
+
+    private PendingIntent wakeIntent() {
+        return PendingIntent.getService(this, 1, new Intent(this, TimerService.class).setAction(ACTION_WAKE),
+                PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private void onTick() {
@@ -219,12 +307,15 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             int urgency = cp <= MINUTE ? 3 : (cp <= 2 * MINUTE || progress >= 0.75f ? 2 : 1);
             alert(urgency, checkpointPhrase(cp));
         }
+        if (crossed >= 0) saveState();
 
         if (remaining <= 0 && !finalFired) {
             finalFired = true;
             setLoudness(1f);
             alert(3, "Time's up!");
             handler.postDelayed(resumeAlarm, 3500);
+            notificationManager().notify(NOTIFICATION_ID, buildNotification());
+            saveState();
         }
 
         if (remaining <= 0) {
@@ -242,24 +333,29 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
                 handler.removeCallbacks(resumeAlarm);
                 alert(3, (mark == 1 ? "One minute" : mark + " minutes") + " over. Time to stop.");
                 if (over < ALARM_MAX_OVERTIME) handler.postDelayed(resumeAlarm, 4500);
+                saveState();
             }
         }
     }
 
     private void finish(boolean record, boolean confirmed) {
-        if (!running) {
-            stopSelf();
-            return;
-        }
+        endRun(record, confirmed);
+        stopForeground(true);
+        stopSelf();
+    }
+
+    /** Stops the current run (if any) and logs it, but leaves the service itself running. */
+    private void endRun(boolean record, boolean confirmed) {
+        if (!running) return;
         running = false;
         handler.removeCallbacks(tick);
         handler.removeCallbacks(resumeAlarm);
         stopAlarm();
         if (tts != null) tts.stop();
-        if (savedAlarmVolume >= 0) {
-            audio.setStreamVolume(AudioManager.STREAM_ALARM, savedAlarmVolume, 0);
-            savedAlarmVolume = -1;
-        }
+        pendingSpeech = null;
+        restoreVolume();
+        alarmManager().cancel(wakeIntent());
+        Store.clearActiveTimer(this);
         if (record) {
             long actual = SystemClock.elapsedRealtime() - startElapsed;
             Store.Run run = new Store.Run(startWall, label, endElapsed - startElapsed, actual, confirmed);
@@ -269,8 +365,13 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             lastRun = null;
         }
         if (wakeLock.isHeld()) wakeLock.release();
-        stopForeground(true);
-        stopSelf();
+    }
+
+    private void restoreVolume() {
+        if (savedAlarmVolume >= 0) {
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, savedAlarmVolume, 0);
+            savedAlarmVolume = -1;
+        }
     }
 
     @Override
@@ -322,7 +423,10 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     }
 
     private void speak(String text) {
-        if (!ttsReady) return;
+        if (!ttsReady) {
+            pendingSpeech = text;
+            return;
+        }
         Bundle params = new Bundle();
         params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM);
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "timenudge");
@@ -392,16 +496,40 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         return minutesPhrase(remainingMs) + " left.";
     }
 
+    private NotificationManager notificationManager() {
+        return (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+    }
+
+    /**
+     * A live clock (time left, or time over once it's up), the end time, and a Done button so the
+     * run can be finished from the lock screen or another app.
+     */
     private Notification buildNotification() {
         PendingIntent open = PendingIntent.getActivity(this, 0,
                 new Intent(this, TimerActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
-        String title = label.isEmpty() ? "Timer" : label;
-        return new Notification.Builder(this)
+        PendingIntent done = PendingIntent.getService(this, 2,
+                new Intent(this, TimerService.class).setAction(ACTION_DONE), PendingIntent.FLAG_UPDATE_CURRENT);
+        long endWall = startWall + (endElapsed - startElapsed);
+        String end = DateFormat.getTimeFormat(this).format(new Date(endWall));
+        boolean over = finalFired;
+        Notification.Builder b = new Notification.Builder(this)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle(title)
-                .setContentText("Countdown running. Tap to open.")
+                .setContentTitle(label.isEmpty() ? "Timer" : label)
+                .setContentText(over ? "Over time since " + end + ". Tap Done when you finish." : "Ends at " + end)
+                .setWhen(endWall)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setCategory(Notification.CATEGORY_ALARM)
                 .setOngoing(true)
                 .setContentIntent(open)
-                .build();
+                .addAction(android.R.drawable.ic_lock_idle_alarm, "Done", done);
+        // setChronometerCountDown() is API 24 (the phone has 25), but the build compiles against 23.
+        Bundle extras = new Bundle();
+        extras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN, !over);
+        b.addExtras(extras);
+        return b.build();
     }
+
+    /** Notification.EXTRA_CHRONOMETER_COUNT_DOWN, which is what setChronometerCountDown() sets. */
+    static final String EXTRA_CHRONOMETER_COUNT_DOWN = "android.chronometerCountDown";
 }

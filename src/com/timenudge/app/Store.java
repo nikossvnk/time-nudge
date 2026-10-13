@@ -8,13 +8,15 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-/** Presets and run history, kept as small JSON arrays in SharedPreferences. */
+/** Presets, run history and the running timer, kept as small JSON values in SharedPreferences. */
 final class Store {
     private static final String PREFS = "timenudge";
     private static final String KEY_PRESETS = "presets";
     private static final String KEY_HISTORY = "history";
+    private static final String KEY_ACTIVE = "active";
     private static final int MAX_HISTORY = 100;
 
     static final class Preset {
@@ -47,6 +49,30 @@ final class Store {
         }
     }
 
+    /** Runs that count for stats: auto-ended ones only show that nobody tapped Done. */
+    static List<Run> confirmed(List<Run> runs) {
+        List<Run> out = new ArrayList<Run>();
+        for (Run r : runs) if (r.confirmed) out.add(r);
+        return out;
+    }
+
+    /**
+     * How long a preset usually really takes, in whole minutes: the median of its last 10
+     * confirmed runs. Null until there are at least 3.
+     */
+    static Integer typicalMinutes(List<Run> runs, String label) {
+        List<Long> times = new ArrayList<Long>();
+        for (Run r : confirmed(runs)) {
+            if (r.label.equals(label)) times.add(r.actualMs);
+            if (times.size() == 10) break;
+        }
+        if (times.size() < 3) return null;
+        Collections.sort(times);
+        int n = times.size();
+        long median = n % 2 == 1 ? times.get(n / 2) : (times.get(n / 2 - 1) + times.get(n / 2)) / 2;
+        return (int) Math.max(1, Math.round(median / 60000.0));
+    }
+
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -67,10 +93,15 @@ final class Store {
                 JSONObject o = a.getJSONObject(i);
                 out.add(new Preset(o.getString("name"), o.getInt("minutes")));
             }
-        } catch (JSONException ignored) {
+        } catch (JSONException e) {
+            // Unreadable: show what was read so far, but don't let a save overwrite the rest.
+            presetsUnreadable = true;
         }
         return out;
     }
+
+    /** Set when stored data couldn't be read, so saving can't silently replace it. */
+    private static boolean presetsUnreadable, historyUnreadable;
 
     static void savePresets(Context c, List<Preset> presets) {
         JSONArray a = new JSONArray();
@@ -80,7 +111,7 @@ final class Store {
             }
         } catch (JSONException ignored) {
         }
-        prefs(c).edit().putString(KEY_PRESETS, a.toString()).apply();
+        if (!presetsUnreadable) prefs(c).edit().putString(KEY_PRESETS, a.toString()).apply();
     }
 
     /** Newest first. */
@@ -93,7 +124,8 @@ final class Store {
                 out.add(new Run(o.getLong("at"), o.optString("label", ""), o.getLong("planned"),
                         o.getLong("actual"), o.optBoolean("confirmed", true)));
             }
-        } catch (JSONException ignored) {
+        } catch (JSONException e) {
+            historyUnreadable = true;
         }
         return out;
     }
@@ -111,10 +143,30 @@ final class Store {
             }
         } catch (JSONException ignored) {
         }
-        prefs(c).edit().putString(KEY_HISTORY, a.toString()).apply();
+        if (!historyUnreadable) prefs(c).edit().putString(KEY_HISTORY, a.toString()).apply();
     }
 
     static void clearHistory(Context c) {
         prefs(c).edit().remove(KEY_HISTORY).apply();
+        historyUnreadable = false;
+    }
+
+    /** The running timer's saved state, or null if none. */
+    static JSONObject activeTimer(Context c) {
+        String raw = prefs(c).getString(KEY_ACTIVE, null);
+        if (raw == null) return null;
+        try {
+            return new JSONObject(raw);
+        } catch (JSONException e) {
+            return null;
+        }
+    }
+
+    static void saveActiveTimer(Context c, JSONObject state) {
+        prefs(c).edit().putString(KEY_ACTIVE, state.toString()).apply();
+    }
+
+    static void clearActiveTimer(Context c) {
+        prefs(c).edit().remove(KEY_ACTIVE).apply();
     }
 }

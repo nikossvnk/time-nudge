@@ -12,8 +12,15 @@ old Android phone (7.1+) that stays at home: tell it how long you have, and it k
 - At zero: "Time's up!" and a looping alarm. Past zero it keeps counting (+1:30) and says
   "N minutes over" every minute up to 10, then every 5 minutes. The alarm sound stops by itself
   after 2 minutes over, and the run auto-closes after 30 (logged with a "?").
+- The notification shows the time left (or over), the end time and a **Done** button.
+- If Android kills the app mid-run, the timer comes back where it was (it's saved, and an alarm
+  wakes it for the next announcement), and your alarm volume is still restored at the end.
 - Tap **Done ✓** when you finish: it logs planned vs actual time. The home screen shows your
-  track record, e.g. "You usually need about 1.4× the time you plan".
+  track record, e.g. "You usually need about 1.4× the time you plan". Runs that auto-ended
+  (nobody tapped Done) are listed with a "?" but left out of the averages.
+- Presets show how long they usually take you (median of the last 10 runs, after 3). Long-press
+  one to switch it to that time; swipe one left to delete it (Undo shows for 8 seconds).
+- History shows the last 5 runs by day; **Show all** lists everything kept (the last 100).
 
 ## Build
 No Gradle needed. On Ubuntu:

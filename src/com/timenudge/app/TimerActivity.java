@@ -130,6 +130,9 @@ public class TimerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (!TimerService.running && Store.activeTimer(this) != null) {
+            TimerService.send(this, TimerService.ACTION_WAKE);
+        }
         handler.post(refresh);
     }
 
