@@ -45,16 +45,31 @@ jobs:
       - name: Test
         run: cd test && mvn -q -B test
 
+      # TimeNudge-1.2.1.apk rather than TimeNudge.apk, so downloads can be told apart.
+      - name: Name the APK after its version
+        id: apk
+        run: |
+          version=$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' AndroidManifest.xml)
+          [ -n "$version" ] || { echo "::error::No versionName in AndroidManifest.xml"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match versionName $version"
+            exit 1
+          fi
+          mv build/TimeNudge.apk "build/TimeNudge-$version.apk"
+          echo "name=TimeNudge-$version" >> "$GITHUB_OUTPUT"
+          echo "path=build/TimeNudge-$version.apk" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v7
         with:
-          name: TimeNudge
-          path: build/TimeNudge.apk
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" build/TimeNudge.apk --title "$GITHUB_REF_NAME" --generate-notes
+          APK: ${{ steps.apk.outputs.path }}
+        run: gh release create "$GITHUB_REF_NAME" "$APK" --title "$GITHUB_REF_NAME" --generate-notes
 
       - name: Remove signing key
         if: always()

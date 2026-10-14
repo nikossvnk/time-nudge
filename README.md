@@ -39,7 +39,7 @@ mkdir -p keystore && keytool -genkeypair -keystore keystore/timenudge.jks -store
   -keypass timenudge -alias timenudge -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Time Nudge"
 ```
 
-GitHub Actions builds the APK on every push (download it from the run's artifacts) and attaches it to
+GitHub Actions builds `TimeNudge-<version>.apk` on every push (download it from the run's artifacts) and attaches it to
 a release when you push a `v*` tag. It signs with the repository secret `KEYSTORE_BASE64`
 (`base64 -w0 timenudge.jks | gh secret set KEYSTORE_BASE64`).
 
