@@ -1,4 +1,4 @@
-package com.timenudge.app;
+package io.github.nikossvnk.timenudge;
 
 import android.app.AlarmManager;
 import android.app.Notification;
@@ -41,12 +41,12 @@ import java.util.TreeSet;
  * service picks up where it left off (and still restores the alarm volume at the end).
  */
 public class TimerService extends Service implements TextToSpeech.OnInitListener {
-    static final String ACTION_START = "com.timenudge.app.START";
-    static final String ACTION_DONE = "com.timenudge.app.DONE";
-    static final String ACTION_CANCEL = "com.timenudge.app.CANCEL";
-    static final String ACTION_SILENCE = "com.timenudge.app.SILENCE";
+    static final String ACTION_START = "io.github.nikossvnk.timenudge.START";
+    static final String ACTION_DONE = "io.github.nikossvnk.timenudge.DONE";
+    static final String ACTION_CANCEL = "io.github.nikossvnk.timenudge.CANCEL";
+    static final String ACTION_SILENCE = "io.github.nikossvnk.timenudge.SILENCE";
     /** Sent by the backup alarm, and by the UI when it finds a saved timer that isn't running. */
-    static final String ACTION_WAKE = "com.timenudge.app.WAKE";
+    static final String ACTION_WAKE = "io.github.nikossvnk.timenudge.WAKE";
     static final String EXTRA_MS = "ms";
     static final String EXTRA_LABEL = "label";
 

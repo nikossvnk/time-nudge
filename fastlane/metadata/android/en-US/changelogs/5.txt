@@ -1,0 +1,1 @@
+New app ID: io.github.nikossvnk.timenudge (was com.timenudge.app). This installs as a separate app: presets and history from the old one don't carry over, so uninstall the old app once you've switched.

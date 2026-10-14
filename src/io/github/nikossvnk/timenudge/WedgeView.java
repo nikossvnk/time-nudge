@@ -1,4 +1,4 @@
-package com.timenudge.app;
+package io.github.nikossvnk.timenudge;
 
 import android.content.Context;
 import android.graphics.Canvas;

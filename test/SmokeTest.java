@@ -1,4 +1,4 @@
-package com.timenudge.app;
+package io.github.nikossvnk.timenudge;
 
 import static org.junit.Assert.*;
 
