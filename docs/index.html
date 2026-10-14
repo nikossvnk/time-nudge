@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Nudge: a spoken countdown for Android</title>
+<meta name="description" content="A countdown for people who lose track of time. It speaks up as time runs out, sounds an alarm at zero and keeps reminding you when you run over. No internet permission, no ads, no tracking.">
+<meta name="theme-color" content="#121212">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Time Nudge">
+<meta property="og:description" content="Spoken countdown that nudges you as time runs out, and keeps nudging when late.">
+<meta property="og:url" content="https://nikossvnk.github.io/time-nudge/">
+<meta property="og:image" content="https://nikossvnk.github.io/time-nudge/img/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="img/icon.png">
+<link rel="apple-touch-icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&amp;family=Atkinson+Hyperlegible:wght@400;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="wrap site-header">
+  <a class="brand" href="#top"><img src="img/icon.png" alt="" width="40" height="40"><span>Time <span class="accent">Nudge</span></span></a>
+  <nav class="site-nav" aria-label="Main">
+    <a href="#how">How it works</a>
+    <a href="#schedule">The nudges</a>
+    <a href="#privacy">Privacy</a>
+    <a href="https://github.com/nikossvnk/time-nudge">Source</a>
+    <a class="btn btn-primary btn-small" href="https://github.com/nikossvnk/time-nudge/releases/latest">Download</a>
+  </nav>
+</header>
+
+<main id="top">
+
+<section class="wrap grid hero">
+  <div class="stack">
+    <p class="eyebrow">A countdown for people who lose track of time</p>
+    <h1>Tell it how long you have. It keeps you <span class="accent">honest.</span></h1>
+    <p class="lead">Time Nudge speaks up as time runs out, sounds an alarm at zero, and keeps reminding you when you run over. Then it shows how long things really take.</p>
+    <div class="buttons">
+      <a class="btn btn-primary" href="https://github.com/nikossvnk/time-nudge/releases/latest">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M6 11l6 6 6-6"/><path d="M5 20h14"/></svg>
+        Download the APK
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/nikossvnk/time-nudge">View on GitHub</a>
+    </div>
+    <p class="faint">Android 7.1 and later · Free and open source (GPL-3.0)</p>
+  </div>
+  <div class="hero-phones">
+    <img class="phone" src="img/home.png" width="720" height="1348" alt="Home screen: How long do you have? with quick buttons for 5 to 30 minutes, Start, and presets">
+    <img class="phone" src="img/countdown.png" width="720" height="1348" alt="Countdown screen: shrinking amber wedge, 1:00 left, Finish up, and a Done button">
+  </div>
+</section>
+
+<section class="strip" aria-label="At a glance">
+  <ul class="wrap">
+    <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFBD20" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5.5 12a10 10 0 0 1 13 0"/><path d="M9 15.5a5 5 0 0 1 6 0"/><path d="M3 3l18 18"/></svg>No internet permission</li>
+    <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFBD20" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 3l18 18"/></svg>No ads</li>
+    <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFBD20" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>No tracking</li>
+    <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFBD20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Everything stays on your phone</li>
+  </ul>
+</section>
+
+<section id="how" class="wrap block" style="padding-bottom: 48px">
+  <h2 style="max-width: 640px">Three taps from “I have ten minutes” to done.</h2>
+  <div class="grid cards">
+    <article class="card stack">
+      <span class="step accent">01 · SET</span>
+      <h3>Say how long you have</h3>
+      <p class="muted">Type minutes, tap 5, 10, 15, 20 or 30, pick one of your presets, or choose <strong style="color: var(--text)">Until a time…</strong> when you need to leave at 8:40.</p>
+    </article>
+    <article class="card stack">
+      <span class="step" style="color: var(--amber)">02 · GO</span>
+      <h3>Let it talk you through it</h3>
+      <p class="muted">A full-screen wedge shrinks from green to amber to red, the screen stays on, and a voice tells you how much time is left, more often as the end gets closer.</p>
+    </article>
+    <article class="card stack">
+      <span class="step" style="color: var(--green)">03 · DONE</span>
+      <h3>Tap Done ✓ and learn</h3>
+      <p class="muted">Every finished run logs planned versus actual time, so next time you know that “10 minutes” really means about 12.</p>
+    </article>
+  </div>
+</section>
+
+<section id="schedule" class="wrap block" style="padding-top: 64px">
+  <div class="stack section-head">
+    <p class="eyebrow">The nudges</p>
+    <h2>Quiet at first. Harder to ignore near the end.</h2>
+    <p class="muted" style="font-size: 19px">Each alert comes with more beeps and a louder voice than the last. Here is a 10-minute timer:</p>
+  </div>
+  <figure class="timeline-box" style="margin-inline: 0">
+    <div class="timeline">
+      <ol class="track" aria-label="Spoken alerts during a 10-minute timer">
+        <li style="left: 30%">“7 minutes left”</li>
+        <li style="left: 60%">“4 minutes”</li>
+        <li style="left: 80%">“2”</li>
+        <li style="left: 90%">“1”</li>
+        <li style="left: 95%">“30 s”</li>
+        <li class="end" style="left: 100%">Time’s up!</li>
+      </ol>
+      <ol class="ticks" aria-hidden="true">
+        <li style="left: 0">0:00</li>
+        <li style="left: 30%">3:00</li>
+        <li style="left: 60%">6:00</li>
+        <li style="left: 80%">8:00</li>
+        <li style="left: 100%">10:00</li>
+      </ol>
+    </div>
+  </figure>
+  <div class="grid" style="--min: 320px">
+    <div class="stack">
+      <h3 style="font-size: 30px">And when you run over, it doesn’t give up.</h3>
+      <p class="muted">Past zero the clock keeps counting up in red. You hear “N minutes over” every minute up to ten, then every five. The alarm sound stops by itself after two minutes, and a forgotten run closes itself after thirty.</p>
+      <ul class="arrows">
+        <li>Longer timers announce every 5 minutes left, then 2 min, 1 min and 30 s.</li>
+        <li>The notification shows time left, the end time and a Done button.</li>
+        <li>If Android stops the app, the timer comes back where it was, and your alarm volume is restored.</li>
+      </ul>
+    </div>
+    <div class="center">
+      <img class="phone" src="img/overtime.png" width="720" height="1348" loading="lazy" alt="Over-time screen: red ring, +0:48, Over time. Wrap it up!, with Done, Silence alarm and Cancel">
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap block grid" style="--gap: 56px; --min: 380px">
+    <div class="center">
+      <img class="phone" src="img/track-record.png" width="720" height="1348" loading="lazy" alt="Track record: last 10 runs, on average 3:14 over plan, and a history of runs with how far over each went">
+    </div>
+    <div class="stack" style="--gap: 24px">
+      <p class="eyebrow">Your track record</p>
+      <h2>Find out what “ten minutes” means for you.</h2>
+      <blockquote class="quote">“You usually need about <strong>1.2×</strong> the time you plan, so 10 min really means ~12.”</blockquote>
+      <p class="muted">Presets show how long they usually take you: the median of your last ten runs, once there are three. Long-press a preset to switch it to that time, or swipe it left to delete it, with Undo. History keeps your last 100 runs.</p>
+    </div>
+  </div>
+</section>
+
+<section id="privacy" class="wrap block">
+  <div class="privacy grid">
+    <h2>It can’t phone home. It doesn’t even have the permission.</h2>
+    <div class="stack" style="--gap: 16px">
+      <p>Time Nudge asks Android for no internet access at all. No ads, no analytics, no account. Your presets and history live on your phone and nowhere else.</p>
+      <p>It was built for an old phone that stays at home, so it runs on Android 7.1 and later.</p>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="wrap grid" style="padding-block: 16px 112px; --gap: 48px; align-items: start">
+  <div class="stack">
+    <h2>Get Time Nudge</h2>
+    <p class="muted">Download the APK from the latest GitHub release and open it on your phone. Android will ask you to allow installs from your browser or file manager the first time.</p>
+    <div class="buttons">
+      <a class="btn btn-primary" href="https://github.com/nikossvnk/time-nudge/releases/latest">Download latest</a>
+      <a class="btn btn-ghost" href="https://github.com/nikossvnk/time-nudge/releases">All releases</a>
+    </div>
+  </div>
+  <div class="card stack" style="--gap: 14px">
+    <h3 style="font-size: 24px">Build it yourself</h3>
+    <p class="muted" style="font-size: 16px">No Gradle needed. On Ubuntu:</p>
+<pre><code>sudo apt install android-sdk-platform-23 aapt \
+  apksigner dalvik-exchange zipalign
+./build.sh   # → build/TimeNudge.apk</code></pre>
+    <p class="faint">Full instructions in the <a href="https://github.com/nikossvnk/time-nudge#build">README</a>.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="who"><img src="img/icon.png" alt="" width="28" height="28"><span>Time Nudge · GPL-3.0-or-later · made by <a href="https://github.com/nikossvnk">nikossvnk</a></span></div>
+    <nav aria-label="Footer">
+      <a href="https://github.com/nikossvnk/time-nudge">Source code</a>
+      <a href="https://github.com/nikossvnk/time-nudge/issues">Report a problem</a>
+      <a href="https://github.com/nikossvnk/time-nudge/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
