@@ -1,0 +1,2 @@
+* New app icon, and the notification shows the app's own icon instead of a generic alarm clock.
+* The countdown takes the icon's colours: yellow, turning orange, then red as time runs out.

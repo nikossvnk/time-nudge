@@ -17,7 +17,11 @@ final class Ui {
     static final int GREEN = Color.rgb(67, 160, 71);
     static final int AMBER = Color.rgb(249, 168, 37);
     static final int RED = Color.rgb(229, 57, 53);
-    static final int ACCENT = Color.rgb(232, 93, 36);
+    static final int ACCENT = Color.rgb(255, 97, 40);  // the logo's orange, #FF6128
+    // The icon ring's gradient, yellow to orange to red (assets/icon.svg).
+    static final int RING_YELLOW = Color.rgb(255, 189, 32);
+    static final int RING_ORANGE = Color.rgb(255, 89, 37);
+    static final int RING_RED = Color.rgb(255, 52, 56);
 
     static int dp(Context c, float v) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
@@ -49,11 +53,11 @@ final class Ui {
         return b;
     }
 
-    /** Green for most of the time, amber from half way, red at the end. */
+    /** The icon ring's colours: yellow for the first half, turning orange, then red at the end. */
     static int colorFor(float progress) {
-        if (progress < 0.5f) return GREEN;
-        if (progress < 0.8f) return blend(GREEN, AMBER, (progress - 0.5f) / 0.3f);
-        return blend(AMBER, RED, Math.min(1f, (progress - 0.8f) / 0.2f));
+        if (progress < 0.5f) return RING_YELLOW;
+        if (progress < 0.8f) return blend(RING_YELLOW, RING_ORANGE, (progress - 0.5f) / 0.3f);
+        return blend(RING_ORANGE, RING_RED, Math.min(1f, (progress - 0.8f) / 0.2f));
     }
 
     static int blend(int a, int b, float t) {

@@ -513,7 +513,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         String end = DateFormat.getTimeFormat(this).format(new Date(endWall));
         boolean over = finalFired;
         Notification.Builder b = new Notification.Builder(this)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(notificationIcon())
                 .setContentTitle(label.isEmpty() ? "Timer" : label)
                 .setContentText(over ? "Over time since " + end + ". Tap Done when you finish." : "Ends at " + end)
                 .setWhen(endWall)
@@ -528,6 +528,16 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         extras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN, !over);
         b.addExtras(extras);
         return b.build();
+    }
+
+    /**
+     * The ic_notification icons in res/drawable-...dpi (the app's ring and clock hands). Looked up by
+     * name rather than through R, which the tests (compiled without aapt) don't have; they get the
+     * stock alarm icon.
+     */
+    private int notificationIcon() {
+        int id = getResources().getIdentifier("ic_notification", "drawable", getPackageName());
+        return id != 0 ? id : android.R.drawable.ic_lock_idle_alarm;
     }
 
     /** Notification.EXTRA_CHRONOMETER_COUNT_DOWN, which is what setChronometerCountDown() sets. */
