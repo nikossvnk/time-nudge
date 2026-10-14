@@ -1,0 +1,2 @@
+* Spoken alerts at least every 5 minutes: timers over 15 minutes announce every 5 minutes left.
+* After time's up: "N minutes over" every minute up to 10, then every 5 minutes, until the run ends itself at 30.

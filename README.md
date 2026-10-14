@@ -45,3 +45,6 @@ a release when you push a `v*` tag. It signs with the repository secret `KEYSTOR
 
 ## Test
 `test/` holds a Robolectric smoke test (Maven + JDK 8) that runs a full 10-minute timer in simulated time.
+
+## License
+GPL-3.0-or-later. See [LICENSE](LICENSE).

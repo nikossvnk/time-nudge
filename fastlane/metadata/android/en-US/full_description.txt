@@ -1,0 +1,23 @@
+<p>A countdown for people who lose track of time. Tell it how long you have, and it keeps you honest: it speaks up as time runs out, sounds an alarm at zero, and keeps reminding you when you run over. Made for an old phone that stays at home and is readable from across the room.</p>
+
+<p><b>While it counts down</b></p>
+<ul>
+<li>Enter minutes (or tap 5/10/15/20/30), pick a preset, or count down <i>until a time</i>.</li>
+<li>Full-screen countdown with a big shrinking wedge, green → amber → red. The screen stays on.</li>
+<li>Spoken alerts at least every 5 minutes, denser near the end (2 minutes, 1 minute, 30 seconds), with more beeps and louder volume each time.</li>
+<li>The notification shows the time left, the end time and a Done button.</li>
+</ul>
+
+<p><b>When time is up</b></p>
+<ul>
+<li>"Time's up!" and an alarm, then "N minutes over" every minute up to 10, then every 5 minutes.</li>
+<li>If nobody taps Done, the run ends by itself after 30 minutes over.</li>
+</ul>
+
+<p><b>Your track record</b></p>
+<ul>
+<li>Tap Done when you finish: it logs planned versus actual time and tells you how far off you usually are, e.g. "You usually need about 1.4× the time you plan".</li>
+<li>Presets show how long they usually take you, and can switch to that time with a long-press.</li>
+</ul>
+
+<p>Keeps working if Android stops the app in the background. No internet access, no ads, no tracking: everything stays on the phone.</p>

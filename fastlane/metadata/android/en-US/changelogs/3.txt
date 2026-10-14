@@ -1,0 +1,7 @@
+* Keeps working if Android stops the app: the timer comes back where it was, and your alarm volume is still restored.
+* Starting a new timer while one runs no longer stops it.
+* Notification with time left, end time and a Done button.
+* Averages leave out runs that ended on their own.
+* Presets show how long they usually take; long-press to switch to that time.
+* Swipe a preset left to delete it, with Undo.
+* History shows the last 5 runs by day, with Show all.

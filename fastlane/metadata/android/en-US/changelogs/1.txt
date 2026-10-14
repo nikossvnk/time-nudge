@@ -1,0 +1,1 @@
+First release: spoken countdown with escalating alerts, alarm at zero, overtime reminders, presets and a track record of planned versus actual time.

@@ -318,6 +318,7 @@ public class MainActivity extends Activity {
             behind.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
             behind.setPadding(0, 0, Ui.dp(this, 22), 0);
             behind.setClickable(false);
+            behind.setAlpha(0f);  // else its red shows at the card's rounded corners
             row.addView(behind, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT));
             row.addView(b, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
@@ -330,7 +331,7 @@ public class MainActivity extends Activity {
                     startTimer(p.minutes * 60000L, p.name);
                 }
             });
-            b.setOnTouchListener(new SwipeToDelete(new Runnable() {
+            b.setOnTouchListener(new SwipeToDelete(behind, new Runnable() {
                 @Override
                 public void run() {
                     presets.remove(index);
@@ -401,12 +402,14 @@ public class MainActivity extends Activity {
      * vertical scrolling pass through untouched.
      */
     private final class SwipeToDelete implements View.OnTouchListener {
+        private final View behind;
         private final Runnable onDelete;
         private final int slop = ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
         private float downX, downY;
         private boolean swiping;
 
-        SwipeToDelete(Runnable onDelete) {
+        SwipeToDelete(View behind, Runnable onDelete) {
+            this.behind = behind;
             this.onDelete = onDelete;
         }
 
@@ -425,6 +428,7 @@ public class MainActivity extends Activity {
                         v.getParent().requestDisallowInterceptTouchEvent(true);  // keep the ScrollView out
                         v.cancelLongPress();
                         v.setPressed(false);
+                        behind.setAlpha(1f);
                     }
                     if (swiping) v.setTranslationX(Math.min(0, dx));
                     return swiping;
@@ -439,6 +443,12 @@ public class MainActivity extends Activity {
                         v.postDelayed(onDelete, 160);  // once it has slid out
                     } else {
                         v.animate().translationX(0).setDuration(150);
+                        v.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                behind.setAlpha(0f);
+                            }
+                        }, 160);
                     }
                     return true;
                 default:
@@ -508,6 +518,8 @@ public class MainActivity extends Activity {
             long over = r.overMs();
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);
+            // Baseline alignment would push the two-line text down to the big number's baseline and clip it.
+            line.setBaselineAligned(false);
             line.setPadding(0, Ui.dp(this, 5), 0, Ui.dp(this, 5));
             String what = r.label.isEmpty() ? "Timer" : r.label;
             TextView left = Ui.text(this, time.format(new java.util.Date(r.startedAt)) + "  " + what

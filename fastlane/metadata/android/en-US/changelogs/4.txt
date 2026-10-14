@@ -1,0 +1,2 @@
+* History: the second line of each run ("planned …") is no longer cut off.
+* Presets: no more thin red edge at the rounded corners.

@@ -344,9 +344,13 @@ public class SmokeTest {
         android.view.View focus = find(root, "Focus block");
         focus.performLongClick();
         assertNull("no stats, so no long-press dialog", org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog());
+        android.view.View behind = ((android.view.ViewGroup) focus.getParent()).getChildAt(0);
+        assertEquals("Delete", ((TextView) behind).getText().toString());
+        assertEquals("red layer hidden until a swipe", 0f, behind.getAlpha(), 0.01f);
         swipe(focus, 400, 350);  // too short: springs back
         assertTrue(hasPreset("Focus block"));
         assertEquals(0f, focus.getTranslationX(), 0.01f);
+        assertEquals("hidden again after springing back", 0f, behind.getAlpha(), 0.01f);
         swipe(focus, 400, 450);  // to the right: ignored
         assertTrue(hasPreset("Focus block"));
 
