@@ -20,4 +20,4 @@
 <li>Presets show how long they usually take you, and can switch to that time with a long-press.</li>
 </ul>
 
-<p>Keeps working if Android stops the app in the background. No internet access, no ads, no tracking: everything stays on the phone.</p>
+<p>Keeps working if Android stops the app in the background. No internet permission, no ads, no tracking: everything stays on the phone.</p>

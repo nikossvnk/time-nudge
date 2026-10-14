@@ -1,7 +1,11 @@
 ![Time Nudge: simple time nudges for a more focused day](assets/banner.png)
 
-A countdown that nudges you as time runs out, for people who lose track of time. It was built for an
-old Android phone (7.1+) that stays at home: tell it how long you have, and it keeps you honest.
+A countdown for people who lose track of time. Tell it how long you have, and it keeps you honest: it
+speaks up as time runs out, sounds an alarm at zero and keeps reminding you when you run over. It also
+tracks how long things really take compared to what you planned.
+
+**No internet permission, no ads, no tracking.** Everything stays on your phone. Works on Android 7.1
+and later; it was built for an old phone that stays at home.
 
 **Download:** the APK is attached to each [release](https://github.com/nikossvnk/time-nudge/releases/latest).
 
