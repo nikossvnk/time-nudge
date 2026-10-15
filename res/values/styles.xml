@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The logo's orange (Ui.ACCENT) for text fields, cursors and dialog buttons instead of the default teal. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#FF6128</item>
+    </style>
+</resources>

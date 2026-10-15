@@ -15,13 +15,14 @@ final class Ui {
     static final int TEXT = Color.rgb(240, 240, 240);
     static final int MUTED = Color.rgb(160, 160, 160);
     static final int GREEN = Color.rgb(67, 160, 71);
-    static final int AMBER = Color.rgb(249, 168, 37);
-    static final int RED = Color.rgb(229, 57, 53);
-    static final int ACCENT = Color.rgb(255, 97, 40);  // the logo's orange, #FF6128
+    static final int ACCENT = Color.rgb(255, 97, 40);  // the logo's orange, #FF6128 (also colorAccent in styles.xml)
     // The icon ring's gradient, yellow to orange to red (assets/icon.svg).
     static final int RING_YELLOW = Color.rgb(255, 189, 32);
     static final int RING_ORANGE = Color.rgb(255, 89, 37);
     static final int RING_RED = Color.rgb(255, 52, 56);
+    // Warnings (a bit over, alarm, delete) use the ring's yellow and red too.
+    static final int AMBER = RING_YELLOW;
+    static final int RED = RING_RED;
 
     static int dp(Context c, float v) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,

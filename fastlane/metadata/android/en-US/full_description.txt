@@ -3,7 +3,7 @@
 <p><b>While it counts down</b></p>
 <ul>
 <li>Enter minutes (or tap 5/10/15/20/30), pick a preset, or count down <i>until a time</i>.</li>
-<li>Full-screen countdown with a big shrinking wedge, green → amber → red. The screen stays on.</li>
+<li>Full-screen countdown with a big shrinking wedge that turns from yellow to orange to red. The screen stays on.</li>
 <li>Spoken alerts at least every 5 minutes, denser near the end (2 minutes, 1 minute, 30 seconds), with more beeps and louder volume each time.</li>
 <li>The notification shows the time left, the end time and a Done button.</li>
 </ul>

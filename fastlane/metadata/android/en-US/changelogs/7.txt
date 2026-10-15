@@ -1,0 +1,2 @@
+* The over-time screen, alarm button and history use the icon's yellow and red too.
+* Text fields and dialogs are orange instead of teal.
