@@ -1,13 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.nikossvnk.timenudge"
-    android:versionCode="7"
-    android:versionName="1.3.2">
+    android:versionCode="8"
+    android:versionName="1.4">
 
-    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="25" />
+    <!-- Runs on Android 7.1 and up, and follows the rules of Android 17 (API 37). -->
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="37" />
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The running timer is a foreground service (Android 9+), of the type for alarms (14+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <!-- The notification with the time left and the Done button (asked for on Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Exact alarms wake the timer for each announcement: granted at install for alarm and timer
+         apps from Android 13, on by default on 12. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+
+    <!-- Android 11+ only lets the app see the text-to-speech engine if it says it needs one. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:label="@string/app_name"
@@ -17,6 +34,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="stateHidden|adjustResize">
             <intent-filter>
@@ -27,9 +45,13 @@
 
         <activity
             android:name=".TimerActivity"
+            android:exported="false"
             android:launchMode="singleTask"
             android:showOnLockScreen="true" />
 
-        <service android:name=".TimerService" android:exported="false" />
+        <service
+            android:name=".TimerService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
     </application>
 </manifest>

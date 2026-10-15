@@ -1,0 +1,3 @@
+* Built for Android 17: no more "built for an older version of Android" warning. Still runs on Android 7.1.
+* Asks to show notifications on Android 13 and later, so the time left and the Done button show up.
+* Keeps announcing, beeping and raising the alarm volume in the background under Android 17's stricter rules.

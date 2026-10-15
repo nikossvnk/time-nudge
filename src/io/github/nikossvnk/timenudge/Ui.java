@@ -2,9 +2,13 @@ package io.github.nikossvnk.timenudge;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -52,6 +56,26 @@ final class Ui {
         b.setPadding(p, p, p, p);
         b.setStateListAnimator(null);
         return b;
+    }
+
+    /**
+     * From Android 15 apps are drawn edge to edge: under the status bar, the navigation bar and the
+     * keyboard. This pads the screen's root view so nothing hides behind them. Earlier versions keep
+     * apps clear of the bars themselves.
+     */
+    static void keepClearOfSystemBars(View root) {
+        if (Build.VERSION.SDK_INT < 35) return;
+        final int left = root.getPaddingLeft(), top = root.getPaddingTop();
+        final int right = root.getPaddingRight(), bottom = root.getPaddingBottom();
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+                v.setPadding(left + bars.left, top + bars.top, right + bars.right, bottom + bars.bottom);
+                return WindowInsets.CONSUMED;
+            }
+        });
     }
 
     /** The icon ring's colours: yellow for the first half, turning orange, then red at the end. */

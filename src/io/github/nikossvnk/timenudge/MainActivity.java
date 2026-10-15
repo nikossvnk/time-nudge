@@ -1,14 +1,17 @@
 package io.github.nikossvnk.timenudge;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.InputFilter;
@@ -186,7 +189,20 @@ public class MainActivity extends Activity {
             }
         });
 
+        Ui.keepClearOfSystemBars(scroll);
         setContentView(scroll);
+        askForNotifications();
+    }
+
+    /**
+     * Android 13+ only shows the timer's notification (time left, Done button) if the user allows
+     * it. Asked once at first launch; the timer works either way. Android doesn't ask again after
+     * the user has said no twice.
+     */
+    private void askForNotifications() {
+        if (Build.VERSION.SDK_INT < 33) return;
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
     }
 
     @Override

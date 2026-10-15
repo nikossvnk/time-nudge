@@ -29,12 +29,17 @@ and later; it was built for an old phone that stays at home.
 - History shows the last 5 runs by day; **Show all** lists everything kept (the last 100).
 
 ## Build
-No Gradle needed. On Ubuntu:
+No Gradle needed. On Ubuntu (24.04 or 26.04):
 
 ```sh
-sudo apt install android-sdk-platform-23 aapt apksigner dalvik-exchange zipalign
+sudo apt install aapt apksigner dalvik-exchange zipalign default-jdk-headless curl unzip
 ./build.sh            # → build/TimeNudge.apk
 ```
+
+The app targets Android 17 and runs on Android 7.1 and later. On first run `build.sh` downloads two
+platform `android.jar` files from Google's SDK repository into `platforms/` and checks their
+SHA-256: Android 17 (API 37) to compile against, and Android 14 (API 34) for the resources, the
+newest that Ubuntu's `aapt` can read.
 
 `build.sh` signs with `keystore/timenudge.jks` (gitignored), or with `KEYSTORE=/path/to/key.jks`, and
 stops if the key isn't there. Keep the key: updates signed with the same key install over the old
@@ -50,7 +55,9 @@ a release when you push a `v*` tag. It signs with the repository secret `KEYSTOR
 (`base64 -w0 timenudge.jks | gh secret set KEYSTORE_BASE64`).
 
 ## Test
-`test/` holds a Robolectric smoke test (Maven + JDK 8) that runs a full 10-minute timer in simulated time.
+`test/` holds Robolectric tests (Maven + JDK 21) that run each timer scenario in simulated time, once
+on Android 7.1 and once on Android 17: `./build.sh` first (for the platform jars), then
+`cd test && mvn test`. Robolectric's Android 17 runtime needs x86-64 Linux (or macOS).
 
 ## License
 GPL-3.0-or-later. See [LICENSE](LICENSE).

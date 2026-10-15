@@ -2,22 +2,26 @@ package io.github.nikossvnk.timenudge;
 
 import android.app.AlarmManager;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.speech.tts.TextToSpeech;
 import android.text.format.DateFormat;
@@ -56,6 +60,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     /** If nobody taps "Done" by now, the run is closed and logged as unconfirmed. */
     private static final long AUTO_END_OVERTIME = 30 * MINUTE;
     private static final int NOTIFICATION_ID = 1;
+    private static final String CHANNEL_ID = "timer";
 
     // Shared with the UI.
     static volatile boolean running;
@@ -157,6 +162,14 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         tts = new TextToSpeech(this, this);
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TimeNudge:timer");
+        if (Build.VERSION.SDK_INT >= 26) {
+            // Silent: the service makes its own sounds. Shown on the lock screen with its Done button.
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Running timer",
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setShowBadge(false);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            notificationManager().createNotificationChannel(channel);
+        }
     }
 
     @Override
@@ -166,6 +179,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
             tts.setLanguage(Locale.getDefault());
         }
+        tts.setAudioAttributes(alarmAudio(AudioAttributes.CONTENT_TYPE_SPEECH));
         ttsReady = true;
         if (pendingSpeech != null && running) speak(pendingSpeech);
         pendingSpeech = null;
@@ -190,6 +204,13 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         } else if (running) {
             onTick();
         } else {
+            // Nothing to continue, e.g. the backup alarm of a run that ended. Android 8+ starts the
+            // service for that alarm as a foreground service, and reports it as crashed unless it
+            // goes to the foreground, even briefly.
+            if (ACTION_WAKE.equals(action) && Build.VERSION.SDK_INT >= 26) {
+                goForeground();
+                stopForeground(true);
+            }
             stopSelf();
         }
         return running ? START_STICKY : START_NOT_STICKY;
@@ -249,10 +270,31 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
     private void resume() {
         long left = Math.max(0, endElapsed - SystemClock.elapsedRealtime());
         if (!wakeLock.isHeld()) wakeLock.acquire(left + AUTO_END_OVERTIME + MINUTE);
-        startForeground(NOTIFICATION_ID, buildNotification());
+        goForeground();
         saveState();
         handler.removeCallbacks(tick);
         handler.post(tick);
+    }
+
+    /**
+     * Shows the notification and keeps Android from stopping the service. On Android 14+ the type
+     * says why it runs: "systemExempted", which alarm and timer apps (those with the exact alarm
+     * permission) may use. That permission also lets it play alarm sounds and change the alarm
+     * volume from the background on Android 17.
+     */
+    private void goForeground() {
+        Notification n = buildNotification();
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED);
+            } else {
+                startForeground(NOTIFICATION_ID, n);
+            }
+        } catch (RuntimeException e) {
+            // Android 12+ can refuse this when the app is in the background. The run goes on, and
+            // the backup alarm wakes the service for the next announcement if Android stops it.
+            notificationManager().notify(NOTIFICATION_ID, n);
+        }
     }
 
     /** Saves the run so a restarted service can continue it, and sets the alarm that wakes it. */
@@ -267,8 +309,14 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
                     .put("lastOverMinute", lastOverMinute).put("silenced", silenced));
         } catch (JSONException ignored) {
         }
-        alarmManager().setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                nextEventElapsed(), wakeIntent());
+        AlarmManager am = alarmManager();
+        if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
+            // Exact alarms need a permission on Android 12+ (granted at install from Android 13).
+            // Without it, an inexact alarm still brings the service back, just up to minutes late.
+            am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, nextEventElapsed(), wakeIntent());
+        } else {
+            am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, nextEventElapsed(), wakeIntent());
+        }
     }
 
     /** When the next announcement (or the auto-end) is due. */
@@ -284,9 +332,12 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         return (AlarmManager) getSystemService(ALARM_SERVICE);
     }
 
+    /** Android 8+ only lets an alarm start a background app's service as a foreground service. */
     private PendingIntent wakeIntent() {
-        return PendingIntent.getService(this, 1, new Intent(this, TimerService.class).setAction(ACTION_WAKE),
-                PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent i = new Intent(this, TimerService.class).setAction(ACTION_WAKE);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        if (Build.VERSION.SDK_INT >= 26) return PendingIntent.getForegroundService(this, 1, i, flags);
+        return PendingIntent.getService(this, 1, i, flags);
     }
 
     private void onTick() {
@@ -412,7 +463,12 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         if (vibrator != null && vibrator.hasVibrator()) {
             long[] pattern = urgency >= 3 ? new long[]{0, 400, 150, 400, 150, 400}
                     : urgency == 2 ? new long[]{0, 300, 150, 300} : new long[]{0, 300};
-            vibrator.vibrate(pattern, -1);
+            if (Build.VERSION.SDK_INT >= 26) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1),
+                        alarmAudio(AudioAttributes.CONTENT_TYPE_SONIFICATION));
+            } else {
+                vibrator.vibrate(pattern, -1);
+            }
         }
         handler.postDelayed(new Runnable() {
             @Override
@@ -432,6 +488,14 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "timenudge");
     }
 
+    /**
+     * Speech, beeps, buzzes and the alarm all count as an alarm: they sound in Do Not Disturb, and
+     * Android 17 lets an alarm app (with the exact alarm permission) play them from the background.
+     */
+    private static AudioAttributes alarmAudio(int contentType) {
+        return new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(contentType).build();
+    }
+
     /** Sets the alarm stream to a fraction of its maximum (never quieter than the user had it). */
     private void setLoudness(float fraction) {
         int max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM);
@@ -447,9 +511,7 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
             Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             alarm = new MediaPlayer();
-            alarm.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            alarm.setAudioAttributes(alarmAudio(AudioAttributes.CONTENT_TYPE_SONIFICATION));
             alarm.setDataSource(this, uri);
             alarm.setLooping(true);
             alarm.prepare();
@@ -505,28 +567,28 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
      * run can be finished from the lock screen or another app.
      */
     private Notification buildNotification() {
-        PendingIntent open = PendingIntent.getActivity(this, 0,
-                new Intent(this, TimerActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, TimerActivity.class), flags);
         PendingIntent done = PendingIntent.getService(this, 2,
-                new Intent(this, TimerService.class).setAction(ACTION_DONE), PendingIntent.FLAG_UPDATE_CURRENT);
+                new Intent(this, TimerService.class).setAction(ACTION_DONE), flags);
         long endWall = startWall + (endElapsed - startElapsed);
         String end = DateFormat.getTimeFormat(this).format(new Date(endWall));
         boolean over = finalFired;
-        Notification.Builder b = new Notification.Builder(this)
-                .setSmallIcon(notificationIcon())
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
+        b.setSmallIcon(notificationIcon())
                 .setContentTitle(label.isEmpty() ? "Timer" : label)
                 .setContentText(over ? "Over time since " + end + ". Tap Done when you finish." : "Ends at " + end)
                 .setWhen(endWall)
                 .setShowWhen(true)
                 .setUsesChronometer(true)
+                .setChronometerCountDown(!over)
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setOngoing(true)
                 .setContentIntent(open)
                 .addAction(android.R.drawable.ic_lock_idle_alarm, "Done", done);
-        // setChronometerCountDown() is API 24 (the phone has 25), but the build compiles against 23.
-        Bundle extras = new Bundle();
-        extras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN, !over);
-        b.addExtras(extras);
+        // Android 12+ otherwise holds back a new foreground service's notification for 10 seconds.
+        if (Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
         return b.build();
     }
 
@@ -539,7 +601,4 @@ public class TimerService extends Service implements TextToSpeech.OnInitListener
         int id = getResources().getIdentifier("ic_notification", "drawable", getPackageName());
         return id != 0 ? id : android.R.drawable.ic_lock_idle_alarm;
     }
-
-    /** Notification.EXTRA_CHRONOMETER_COUNT_DOWN, which is what setChronometerCountDown() sets. */
-    static final String EXTRA_CHRONOMETER_COUNT_DOWN = "android.chronometerCountDown";
 }

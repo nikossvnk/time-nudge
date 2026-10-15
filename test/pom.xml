@@ -1,16 +1,39 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
 <groupId>t</groupId><artifactId>t</artifactId><version>1</version>
-<!-- Run with JDK 8. Override -Dandroid.jar=... if the API 23 android.jar is elsewhere; pass
-     -Drobolectric.deps=/dir to use pre-downloaded android-all jars instead of Maven Central. -->
-<properties><maven.compiler.source>8</maven.compiler.source><maven.compiler.target>8</maven.compiler.target><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-<android.jar>/usr/lib/android-sdk/platforms/android-23/android.jar</android.jar></properties>
+<!-- Run with JDK 21. Compiles against the API 37 android.jar that ../build.sh downloads (run it
+     first, or pass -Dandroid.jar=...). Pass -Drobolectric.deps=/dir to use pre-downloaded
+     android-all jars instead of Maven Central. -->
+<properties>
+<!-- The app's code stays Java 8 (dx can't handle newer); the tests can use newer Java. -->
+<maven.compiler.source>8</maven.compiler.source><maven.compiler.target>8</maven.compiler.target>
+<maven.compiler.testSource>17</maven.compiler.testSource><maven.compiler.testTarget>17</maven.compiler.testTarget>
+<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+<android.jar>${basedir}/../platforms/37.0_r02/android.jar</android.jar></properties>
 <dependencies>
-<dependency><groupId>org.robolectric</groupId><artifactId>robolectric</artifactId><version>3.8</version><scope>test</scope><exclusions><exclusion><groupId>androidx.test</groupId><artifactId>*</artifactId></exclusion><exclusion><groupId>androidx.test.espresso</groupId><artifactId>*</artifactId></exclusion></exclusions></dependency>
+<dependency><groupId>org.robolectric</groupId><artifactId>robolectric</artifactId><version>4.17</version><scope>test</scope><exclusions><exclusion><groupId>androidx.test</groupId><artifactId>*</artifactId></exclusion><exclusion><groupId>androidx.test.espresso</groupId><artifactId>*</artifactId></exclusion></exclusions></dependency>
 <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version><scope>test</scope></dependency>
-<dependency><groupId>android</groupId><artifactId>android</artifactId><version>23</version><scope>system</scope><systemPath>${android.jar}</systemPath></dependency>
+<dependency><groupId>android</groupId><artifactId>android</artifactId><version>37</version><scope>system</scope><systemPath>${android.jar}</systemPath></dependency>
 </dependencies>
+<!-- Robolectric needs androidx.test's monitor at runtime. It's only published on Google's Maven
+     repository, as an Android library (.aar), so the build copies it and unzips the jar inside it. -->
+<repositories><repository><id>google</id><url>https://maven.google.com</url></repository></repositories>
 <build><sourceDirectory>../src</sourceDirectory><testSourceDirectory>${basedir}</testSourceDirectory>
-<plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version><configuration><systemPropertyVariables><robolectric.dependency.repo.url>https://repo1.maven.org/maven2</robolectric.dependency.repo.url></systemPropertyVariables></configuration></plugin></plugins></build>
+<plugins>
+<plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version></plugin>
+<plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version>
+<executions><execution><id>androidx-test-monitor</id><phase>generate-test-resources</phase><goals><goal>copy</goal></goals>
+<configuration><artifactItems><artifactItem><groupId>androidx.test</groupId><artifactId>monitor</artifactId><version>1.8.0</version><type>aar</type>
+<outputDirectory>${project.build.directory}/androidx-test-monitor</outputDirectory><destFileName>monitor.aar</destFileName></artifactItem></artifactItems></configuration>
+</execution></executions></plugin>
+<plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.1.0</version>
+<executions><execution><id>androidx-test-monitor-jar</id><phase>generate-test-resources</phase><goals><goal>run</goal></goals>
+<configuration><target><unzip src="${project.build.directory}/androidx-test-monitor/monitor.aar" dest="${project.build.directory}/androidx-test-monitor"><patternset><include name="classes.jar"/></patternset></unzip></target></configuration>
+</execution></executions></plugin>
+<plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version><configuration>
+<!-- Robolectric reaches into JDK internals for newer Android versions. -->
+<argLine>--add-exports=java.base/jdk.internal.access=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED</argLine>
+<additionalClasspathElements><additionalClasspathElement>${project.build.directory}/androidx-test-monitor/classes.jar</additionalClasspathElement></additionalClasspathElements>
+<systemPropertyVariables><robolectric.dependency.repo.url>https://repo1.maven.org/maven2</robolectric.dependency.repo.url></systemPropertyVariables></configuration></plugin></plugins></build>
 <profiles><profile><id>offline</id><activation><property><name>robolectric.deps</name></property></activation>
 <build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version><configuration><systemPropertyVariables><robolectric.offline>true</robolectric.offline><robolectric.dependency.dir>${robolectric.deps}</robolectric.dependency.dir></systemPropertyVariables></configuration></plugin></plugins></build>
 </profile></profiles>

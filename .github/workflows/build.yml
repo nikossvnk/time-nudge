@@ -12,14 +12,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
       - name: Install Android build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y android-sdk-platform-23 aapt apksigner dalvik-exchange zipalign
+          sudo apt-get install -y aapt apksigner dalvik-exchange zipalign
+
+      # The two platform android.jar files build.sh downloads from Google (checksum-checked).
+      - uses: actions/cache@v6
+        with:
+          path: platforms
+          key: platforms-${{ hashFiles('build.sh') }}
 
       # The signing key is a base64-encoded repository secret, never part of the repo. build.sh
       # fails if it's missing, so a build is never signed with a different key.
@@ -36,11 +42,14 @@ jobs:
       - name: Build
         run: KEYSTORE="$RUNNER_TEMP/timenudge.jks" ./build.sh
 
-      # Robolectric 3.8 needs JDK 8. Set up after building so build.sh uses the system JDK.
+      # Robolectric runs the tests on Android 7.1 and Android 17; it needs JDK 21 and x86 Linux.
+      # The Maven cache also keeps Robolectric's Android images between runs.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '8'
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: test/pom.xml
 
       - name: Test
         run: cd test && mvn -q -B test

@@ -19,7 +19,7 @@ import org.robolectric.shadows.ShadowTextToSpeech;
 import org.robolectric.shadow.api.Shadow;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 26, manifest = Config.NONE)
+@Config(sdk = {25, 37}, manifest = Config.NONE)  // the old phone, and Android 17
 public class SmokeTest {
     private static String spoken(TimerService s) throws Exception {
         java.lang.reflect.Field f = TimerService.class.getDeclaredField("tts");
@@ -62,7 +62,7 @@ public class SmokeTest {
         TimerService.startElapsed = TimerService.endElapsed = TimerService.startWall = 0;
     }
 
-    /** Shadow.extract instead of Shadows.shadowOf: its overloads need classes newer than API 23. */
+    /** Shadow.extract rather than Shadows.shadowOf, which needs many more imports. */
     private static org.robolectric.shadows.ShadowService shadowService(TimerService svc) {
         return Shadow.extract(svc);
     }
@@ -268,7 +268,7 @@ public class SmokeTest {
         assertEquals("Get ready to leave", n.extras.getString(android.app.Notification.EXTRA_TITLE));
         assertTrue(n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().startsWith("Ends at "));
         assertEquals(TimerService.startWall + 10 * 60000L, n.when);
-        assertTrue(n.extras.getBoolean(TimerService.EXTRA_CHRONOMETER_COUNT_DOWN));
+        assertTrue(n.extras.getBoolean(android.app.Notification.EXTRA_CHRONOMETER_COUNT_DOWN));
         assertEquals(1, n.actions.length);
         assertEquals("Done", n.actions[0].title.toString());
 
@@ -278,7 +278,7 @@ public class SmokeTest {
         org.robolectric.shadows.ShadowNotificationManager shadowNm = Shadow.extract(nm);
         android.app.Notification over = shadowNm.getNotification(1);
         assertTrue(over.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString().startsWith("Over time since "));
-        assertFalse(over.extras.getBoolean(TimerService.EXTRA_CHRONOMETER_COUNT_DOWN));
+        assertFalse(over.extras.getBoolean(android.app.Notification.EXTRA_CHRONOMETER_COUNT_DOWN));
 
         // Tapping Done in the notification ends and logs the run.
         svc.onStartCommand(savedIntent(over.actions[0].actionIntent), 0, 2);
@@ -308,6 +308,7 @@ public class SmokeTest {
         android.widget.Button use = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);
         assertEquals("Use 13 min", use.getText().toString());
         use.performClick();
+        ShadowLooper.idleMainLooper();  // dialog buttons reach their listener through the message queue
         boolean found = false;
         for (Store.Preset p : Store.presets(c)) {
             if (p.name.equals("Quick task")) {
@@ -462,5 +463,155 @@ public class SmokeTest {
         main.pause().resume();
         System.out.println("HOME AFTER: " + allText(main.get().getWindow().getDecorView()));
         assertEquals(1, Store.history(main.get()).size());
+    }
+
+    // --- what changes between Android 7.1 and Android 17 ------------------------------------
+
+    private static org.robolectric.shadows.ShadowAlarmManager alarms() {
+        return Shadow.extract(RuntimeEnvironment.getApplication().getSystemService(android.content.Context.ALARM_SERVICE));
+    }
+
+    @Test
+    public void timerRunsAsAnAlarmTypeForegroundServiceWithItsOwnChannel() throws Exception {
+        TimerService svc = newService();
+        startTimer(svc, 10 * 60000L, "Get ready to leave");
+        android.app.Notification n = shadowService(svc).getLastForegroundNotification();
+        assertNotNull("the service is in the foreground", n);
+        assertEquals("Get ready to leave", n.extras.getString(android.app.Notification.EXTRA_TITLE));
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            assertEquals("timer", n.getChannelId());
+            android.app.NotificationManager nm = (android.app.NotificationManager)
+                    RuntimeEnvironment.getApplication().getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+            android.app.NotificationChannel channel = nm.getNotificationChannel("timer");
+            assertEquals("Running timer", channel.getName().toString());
+            assertEquals("silent: the app makes its own sounds",
+                    android.app.NotificationManager.IMPORTANCE_LOW, channel.getImportance());
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            assertEquals(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED,
+                    svc.getForegroundServiceType());
+        }
+        // Both buttons of the notification keep working with immutable PendingIntents.
+        org.robolectric.shadows.ShadowPendingIntent open = Shadow.extract(n.contentIntent);
+        assertTrue(open.isImmutable());
+        assertEquals(TimerActivity.class.getName(), open.getSavedIntent().getComponent().getClassName());
+        org.robolectric.shadows.ShadowPendingIntent done = Shadow.extract(n.actions[0].actionIntent);
+        assertTrue(done.isImmutable());
+        assertEquals(TimerService.ACTION_DONE, done.getSavedIntent().getAction());
+    }
+
+    @Test
+    public void backupAlarmIsExactAndStartsAForegroundServiceOnAndroid8AndUp() throws Exception {
+        // Installing the app grants USE_EXACT_ALARM; the tests have no manifest, so grant it here.
+        if (android.os.Build.VERSION.SDK_INT >= 31) org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(true);
+        TimerService svc = newService();
+        startTimer(svc, 10 * 60000L, "");
+        org.robolectric.shadows.ShadowAlarmManager.ScheduledAlarm next = alarms().getNextScheduledAlarm();
+        assertEquals(TimerService.endElapsed - 7 * 60000L, next.getTriggerAtMs());
+        assertEquals(org.robolectric.shadows.ShadowAlarmManager.WINDOW_EXACT, next.getWindowLengthMs());
+        assertTrue(next.isAllowWhileIdle());
+        org.robolectric.shadows.ShadowPendingIntent wake = Shadow.extract(next.operation);
+        assertTrue(wake.isImmutable());
+        assertEquals(TimerService.ACTION_WAKE, wake.getSavedIntent().getAction());
+        // Android 8+ doesn't let an alarm start a plain service of an app in the background.
+        assertEquals(android.os.Build.VERSION.SDK_INT >= 26, wake.isForegroundServiceIntent());
+    }
+
+    @Test
+    @Config(sdk = 37)
+    public void withoutTheExactAlarmPermissionTheBackupAlarmIsInexact() throws Exception {
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false);
+        TimerService svc = newService();
+        startTimer(svc, 10 * 60000L, "");
+        org.robolectric.shadows.ShadowAlarmManager.ScheduledAlarm next = alarms().getNextScheduledAlarm();
+        assertNotNull("still an alarm, just not an exact one", next);
+        assertEquals(TimerService.endElapsed - 7 * 60000L, next.getTriggerAtMs());
+        assertNotEquals(org.robolectric.shadows.ShadowAlarmManager.WINDOW_EXACT, next.getWindowLengthMs());
+        assertTrue(next.isAllowWhileIdle());
+        advance(3 * 60000L + 2000);
+        assertEquals("the countdown itself doesn't depend on the alarm", "7 minutes left.", spoken(svc));
+    }
+
+    @Test
+    public void aWakeAlarmWithNothingToContinueStopsWithoutCrashing() throws Exception {
+        TimerService svc = newService();
+        int mode = svc.onStartCommand(new Intent(TimerService.ACTION_WAKE), 0, 1);
+        assertEquals(android.app.Service.START_NOT_STICKY, mode);
+        assertFalse(TimerService.running);
+        assertTrue(shadowService(svc).isStoppedBySelf());
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            // Started as a foreground service, it has to go to the foreground before stopping.
+            assertEquals(1, shadowService(svc).getLastForegroundNotificationId());
+            assertTrue(shadowService(svc).isForegroundStopped());
+        }
+        android.app.NotificationManager nm = (android.app.NotificationManager)
+                RuntimeEnvironment.getApplication().getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+        org.robolectric.shadows.ShadowNotificationManager shadowNm = Shadow.extract(nm);
+        assertEquals("no notification left behind", 0, shadowNm.size());
+    }
+
+    @Test
+    public void ifAndroidRefusesTheForegroundTheTimerStillRunsAndShowsItsNotification() throws Exception {
+        TimerService svc = Robolectric.buildService(TimerService.class).create().get();
+        shadowService(svc).setThrowInStartForeground(new IllegalStateException("not allowed from the background"));
+        svc.onInit(TextToSpeech.SUCCESS);
+        startTimer(svc, 5 * 60000L, "Quick task");
+        assertTrue(TimerService.running);
+        android.app.NotificationManager nm = (android.app.NotificationManager)
+                RuntimeEnvironment.getApplication().getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+        org.robolectric.shadows.ShadowNotificationManager shadowNm = Shadow.extract(nm);
+        assertEquals("Quick task", shadowNm.getNotification(1).extras.getString(android.app.Notification.EXTRA_TITLE));
+        advance(5 * 60000L + 4000);
+        assertEquals("Time's up!", spoken(svc));
+    }
+
+    @Test
+    public void asksToShowNotificationsOnlyWhereAndroidRequiresIt() {
+        ActivityController<MainActivity> main = Robolectric.buildActivity(MainActivity.class).setup();
+        org.robolectric.shadows.ShadowActivity sh = Shadow.extract(main.get());
+        org.robolectric.shadows.ShadowActivity.PermissionsRequest asked = sh.getLastRequestedPermission();
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            assertArrayEquals(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, asked.requestedPermissions);
+        } else {
+            assertNull(asked);
+        }
+    }
+
+    @Test
+    public void screensKeepClearOfTheStatusAndNavigationBarsOnAndroid15AndUp() {
+        android.view.WindowInsets insets = null;
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            insets = new android.view.WindowInsets.Builder()
+                    .setInsets(android.view.WindowInsets.Type.statusBars(), android.graphics.Insets.of(0, 63, 0, 0))
+                    .setInsets(android.view.WindowInsets.Type.navigationBars(), android.graphics.Insets.of(0, 0, 0, 48))
+                    .build();
+        }
+        ActivityController<MainActivity> main = Robolectric.buildActivity(MainActivity.class).setup();
+        android.view.View home = main.get().findViewById(android.R.id.content);
+        home = ((android.view.ViewGroup) home).getChildAt(0);  // the ScrollView set as content
+        ActivityController<TimerActivity> timer = Robolectric.buildActivity(TimerActivity.class).setup();
+        android.view.View countdown = ((android.view.ViewGroup) timer.get().findViewById(android.R.id.content)).getChildAt(0);
+        int pad = Ui.dp(timer.get(), 20);
+        if (insets != null) {
+            home.dispatchApplyWindowInsets(insets);
+            countdown.dispatchApplyWindowInsets(insets);
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            assertEquals(63, home.getPaddingTop());
+            assertEquals(48, home.getPaddingBottom());
+            assertEquals(pad + 63, countdown.getPaddingTop());
+            assertEquals(pad + 48, countdown.getPaddingBottom());
+        } else {
+            assertEquals(0, home.getPaddingTop());
+            assertEquals(pad, countdown.getPaddingTop());
+        }
+    }
+
+    @Test
+    public void runsOnTheAndroidVersionsItClaims() {
+        // Guards the two-version setup: the class runs once on 7.1 (API 25) and once on Android 17.
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        assertTrue("SDK " + sdk, sdk == 25 || sdk == 37);
+        System.out.println("RAN ON SDK " + sdk);
     }
 }
