@@ -1,0 +1,8 @@
+# Opens pull requests to update the actions of the workflows. The Build workflow runs on them, so
+# an update that breaks the build is noticed before it is merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
