@@ -11,7 +11,8 @@ and later; it was built for an old phone that stays at home.
 
 ## What it does
 - Enter minutes (or tap 5/10/15/20/30), tap a preset, or pick **Until a time…**.
-- Full-screen countdown with a shrinking wedge that turns from yellow to orange to red. Screen stays on.
+- Full-screen countdown with a shrinking wedge that turns from yellow to orange to red. Screen stays
+  on while the timer runs; once it's over, the screen turns off and the phone locks as usual.
 - Spoken alerts at least every 5 minutes, denser toward the end, with more beeps and louder volume
   each time. For 10 minutes: 3, 6, 8, 9 and 9.5 minutes in, then the alarm at 10. Timers over
   15 minutes announce every 5 minutes left, then 2 min, 1 min and 30 s.

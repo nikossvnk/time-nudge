@@ -18,7 +18,10 @@ import android.widget.TextView;
 import java.text.DateFormat;
 import java.util.Date;
 
-/** Full-screen countdown. Keeps the screen on and shows over the lock screen. */
+/**
+ * Full-screen countdown. While the timer runs it keeps the screen on and shows over the lock screen.
+ * Once it's over, the screen times out and the phone locks as it normally would.
+ */
 public class TimerActivity extends Activity {
     private final Handler handler = new Handler();
     private LinearLayout root;
@@ -41,15 +44,7 @@ public class TimerActivity extends Activity {
         super.onCreate(state);
         openedAt = SystemClock.elapsedRealtime();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        // Show over the lock screen. Android 8.1 replaced the window flags with these methods.
-        if (Build.VERSION.SDK_INT >= 27) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        } else {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
-        }
+        showOverLockScreen(true);
 
         int pad = Ui.dp(this, 20);
         root = new LinearLayout(this);
@@ -148,6 +143,21 @@ public class TimerActivity extends Activity {
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(refresh);
+        // Paused on the summary (screen off, or the user left): from now on the lock screen comes first.
+        if (showingSummary) showOverLockScreen(false);
+    }
+
+    /** Shows over the lock screen and turns the screen on. Android 8.1 replaced the window flags with these methods. */
+    private void showOverLockScreen(boolean show) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(show);
+            setTurnScreenOn(show);
+        } else {
+            int flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD;
+            if (show) getWindow().addFlags(flags); else getWindow().clearFlags(flags);
+        }
     }
 
     private void goHome() {
@@ -167,7 +177,12 @@ public class TimerActivity extends Activity {
             renderSummary(run);
             return;
         }
-        showingSummary = false;
+        if (showingSummary) {
+            // A new timer started on top of the last summary.
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            showOverLockScreen(true);
+            showingSummary = false;
+        }
         long now = SystemClock.elapsedRealtime();
         long total = Math.max(1, TimerService.endElapsed - TimerService.startElapsed);
         long remaining = TimerService.endElapsed - now;
@@ -199,7 +214,11 @@ public class TimerActivity extends Activity {
     }
 
     private void renderSummary(Store.Run run) {
-        showingSummary = true;
+        if (!showingSummary) {
+            // The timer is over (Done, or auto-ended 30 minutes over): let the screen time out as usual.
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            showingSummary = true;
+        }
         root.setBackgroundColor(Ui.BG);
         long over = run.overMs();
         int color = over <= 0 ? Ui.GREEN : (over < 3 * 60000 ? Ui.AMBER : Ui.RED);

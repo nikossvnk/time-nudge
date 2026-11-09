@@ -465,6 +465,50 @@ public class SmokeTest {
         assertEquals(1, Store.history(main.get()).size());
     }
 
+    private static boolean keepsScreenOn(TimerActivity a) {
+        return (a.getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0;
+    }
+
+    private static boolean showsOverLockScreen(TimerActivity a) {
+        if (android.os.Build.VERSION.SDK_INT >= 27) {
+            org.robolectric.shadows.ShadowActivity sh = Shadow.extract(a);
+            return sh.getShowWhenLocked() && sh.getTurnScreenOn();
+        }
+        int flags = android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                | android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD;
+        return (a.getWindow().getAttributes().flags & flags) == flags;
+    }
+
+    @Test
+    public void onceTheTimerIsOverTheScreenCanTurnOffAndLock() throws Exception {
+        TimerService svc = newService();
+        startTimer(svc, 5 * 60000L, "");
+        ActivityController<TimerActivity> timer = Robolectric.buildActivity(TimerActivity.class).setup();
+        advance(34 * 60000L);
+        assertTrue(TimerService.running);
+        assertTrue(keepsScreenOn(timer.get()));
+        assertTrue(showsOverLockScreen(timer.get()));
+
+        // Auto-ends at 30 minutes over: the summary still shows, but no longer holds the screen on.
+        advance(2 * 60000L);
+        assertFalse(TimerService.running);
+        assertNotNull(find(timer.get().getWindow().getDecorView(), "over (auto-ended"));
+        assertFalse(keepsScreenOn(timer.get()));
+        assertTrue(showsOverLockScreen(timer.get()));
+
+        // The screen goes off: when it comes back, the lock screen shows first.
+        timer.pause();
+        assertFalse(showsOverLockScreen(timer.get()));
+
+        // A new timer reuses the activity (singleTask) and holds the screen again.
+        startTimer(svc, 10 * 60000L, "");
+        timer.resume();
+        advance(500);
+        assertTrue(keepsScreenOn(timer.get()));
+        assertTrue(showsOverLockScreen(timer.get()));
+    }
+
     // --- what changes between Android 7.1 and Android 17 ------------------------------------
 
     private static org.robolectric.shadows.ShadowAlarmManager alarms() {
